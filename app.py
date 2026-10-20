@@ -16,6 +16,13 @@ from analytics.trend_engine import (
     get_top_employers,
     get_filtered_leads,
 )
+from analytics.pitch_generator import generate_sales_pitch
+from analytics.weekly_digest import (
+    build_weekly_intelligence_data,
+    format_markdown_digest,
+    format_html_digest,
+    send_slack_notification,
+)
 from ingestion.pipeline import run_pipeline
 
 # ----------------- PAGE CONFIGURATION -----------------
@@ -345,10 +352,11 @@ st.markdown(
 )
 
 # ----------------- MAIN TABS -----------------
-tab_market, tab_leads, tab_strategy = st.tabs([
+tab_market, tab_leads, tab_strategy, tab_digest = st.tabs([
     "Marknadsöversikt & Kompetenser",
     "Uppdrag & Lead Pipeline",
     "Strategiskt Beslutsunderlag",
+    "Ledningsrapport & Veckobrev",
 ])
 
 # ----------------- TAB 1: MARKNADSÖVERSIKT -----------------
@@ -524,6 +532,26 @@ with tab_leads:
             unsafe_allow_html=True,
         )
 
+        with st.expander(f"Skapa konsultpitch & säljmejl ({lead['company_name']})"):
+            col_p1, col_p2 = st.columns([3, 2])
+            with col_p1:
+                default_profile = f"Senior specialist inom {', '.join(lead['skills'][:3]) if lead['skills'] else 'systemutveckling'}"
+                c_role = st.text_input(
+                    "Konsultprofil / Erfarenhetsinriktning",
+                    value=default_profile,
+                    key=f"role_{lead['id']}",
+                )
+            with col_p2:
+                c_avail = st.text_input(
+                    "Tillgänglig från",
+                    value="inom 2–4 veckor",
+                    key=f"avail_{lead['id']}",
+                )
+
+            pitch = generate_sales_pitch(lead, consultant_profile=c_role, available_from=c_avail)
+            st.text_input("Föreslagen ämnesrad", value=pitch["subject"], key=f"subj_{lead['id']}")
+            st.text_area("Färdigt säljmejl (redigerbart)", value=pitch["body"], height=190, key=f"body_{lead['id']}")
+
 # ----------------- TAB 3: STRATEGISKT BESLUTSUNDERLAG -----------------
 with tab_strategy:
     st.markdown("##### Strategiska prioriteringar för ledningen")
@@ -598,5 +626,51 @@ with tab_strategy:
         """,
         unsafe_allow_html=True,
     )
+
+# ----------------- TAB 4: VECKORAPPORT & LEDNINGSBREV -----------------
+with tab_digest:
+    st.markdown("##### Veckorapport: Marknadsintelligens för ledningen")
+    st.caption("Aggregerad sammanställning av den senaste veckans uppdragsflöde, heta leads och kompetenstrender.")
+
+    digest_data = build_weekly_intelligence_data(db, days_back=7)
+    digest_md = format_markdown_digest(digest_data)
+    digest_html = format_html_digest(digest_data)
+
+    col_d1, col_d2, col_d3 = st.columns(3)
+    with col_d1:
+        st.metric("Totala Aktiva Uppdrag", f"{digest_data['total_active']} st")
+    with col_d2:
+        st.metric("Direkta Konsultuppdrag", f"{digest_data['consultant_leads']} st")
+    with col_d3:
+        st.metric("Nya Poster Senaste 7 Dagar", f"{digest_data['new_this_week']} st")
+
+    st.markdown("---")
+
+    col_btn_md, col_btn_html, col_btn_slack = st.columns([1, 1, 2])
+    with col_btn_md:
+        st.download_button(
+            label="Ladda ner Markdown (.md)",
+            data=digest_md,
+            file_name=f"marknadsrapport_{digest_data['report_date']}.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
+    with col_btn_html:
+        st.download_button(
+            label="Ladda ner HTML-brev (.html)",
+            data=digest_html,
+            file_name=f"marknadsbrev_{digest_data['report_date']}.html",
+            mime="text/html",
+            use_container_width=True,
+        )
+    with col_btn_slack:
+        if st.button("Skicka rapport till Slack/Teams-webhook", use_container_width=True):
+            if send_slack_notification(digest_md):
+                st.success("Veckorapporten har skickats till webhooken!")
+            else:
+                st.info("Ingen 'SLACK_WEBHOOK_URL' är konfigurerad i .env eller GitHub Secrets än.")
+
+    st.markdown("##### Förhandsgranskning av veckorapporten")
+    st.markdown(digest_md)
 
 db.close()
