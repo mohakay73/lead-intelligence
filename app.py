@@ -257,7 +257,7 @@ st.sidebar.markdown("**Filter**")
 
 selected_location = st.sidebar.selectbox(
     "Kommun / Ort",
-    ["Alla", "Linköping", "Norrköping", "Motala", "Finspång", "Mjölby"],
+    ["Alla", "Linköping", "Norrköping", "Södertälje", "Nyköping", "Motala", "Finspång", "Mjölby"],
 )
 
 selected_source = st.sidebar.selectbox(
@@ -302,7 +302,7 @@ st.markdown(
     <div class="header-container">
         <div>
             <div class="header-title">Marknadsintelligens & Beslutsstöd</div>
-            <div class="header-subtitle">IT- och teknikmarknaden i Östergötland (Linköping, Norrköping)</div>
+            <div class="header-subtitle">IT- och teknikmarknaden i Östergötland & E4 Syd (Linköping, Norrköping, Södertälje, Nyköping)</div>
         </div>
         <div>
             <div class="status-badge">
@@ -388,9 +388,9 @@ with tab_market:
                 loc_df,
                 values="count",
                 names="location",
-                title="Geografisk fördelning i länet",
+                title="Geografisk fördelning (Östergötland & E4 Syd)",
                 hole=0.55,
-                color_discrete_sequence=["#3b82f6", "#60a5fa", "#93c5fd", "#06b6d4", "#a5f3fc"],
+                color_discrete_sequence=["#2563eb", "#3b82f6", "#10b981", "#06b6d4", "#f59e0b", "#8b5cf6", "#ec4899", "#cbd5e1"],
             )
             fig_loc.update_traces(textposition="inside", textinfo="percent+label")
             fig_loc.update_layout(
@@ -580,6 +580,19 @@ with tab_strategy:
             </div>
             <div class="action-note">
                 <strong>Ledningsåtgärd:</strong> Positionera erbjudandet kring helhetslösningar inom data engineering snarare än enskilda rapportbyggen.
+            </div>
+        </div>
+
+        <div class="strategy-card">
+            <div class="strategy-header">
+                <span class="strategy-name">5. Fordonselektrifiering & Life Science (Södertälje & Nyköping)</span>
+                <span class="priority-pill p-growth">Expansionsområde</span>
+            </div>
+            <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
+                Scania- och AstraZeneca-klustren i Södertälje samt industrin kring Nyköping skapar stor efterfrågan inom fordonsprogramvara (AUTOSAR, C++, diagnostik, Linux) och validerade Life Science-molnplattformar.
+            </div>
+            <div class="action-note">
+                <strong>Ledningsåtgärd:</strong> Rikta konsultbearbetning mot fordons- och automationsbolag i E4 Syd-korridoren som komplement till Mjärdevi- och SAAB-affärerna.
             </div>
         </div>
         """,

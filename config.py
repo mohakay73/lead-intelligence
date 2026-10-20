@@ -28,8 +28,10 @@ JOBTECH_API_KEY = os.getenv("JOBTECH_API_KEY", "")  # Optional for basic public 
 BRAINVILLE_API_URL = os.getenv("BRAINVILLE_API_URL", "https://api.brainville.com/api")
 BRAINVILLE_API_KEY = os.getenv("BRAINVILLE_API_KEY", "")
 
-# Regional focus (Östergötland)
+# Regional focus (Östergötland + Nyköping & Södertälje i E4-korridoren)
 TARGET_REGION_CODE = "05"  # Östergötlands län
+TARGET_EXTRA_MUNICIPALITY_CODES = ["0480", "0181"]  # Nyköping (0480), Södertälje (0181)
+
 TARGET_MUNICIPALITIES = {
     "0580": "Linköping",
     "0581": "Norrköping",
@@ -44,6 +46,8 @@ TARGET_MUNICIPALITIES = {
     "0513": "Kinda",
     "0560": "Boxholm",
     "0561": "Åtvidaberg",
+    "0480": "Nyköping",
+    "0181": "Södertälje",
 }
 
 # JobTech Taxonomy occupation-field for IT / Data

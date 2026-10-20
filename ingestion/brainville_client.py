@@ -22,7 +22,7 @@ class BrainvilleClient:
         if self.api_key:
             return self._fetch_live_api()
         else:
-            logger.info("No BRAINVILLE_API_KEY set. Providing mock consultant assignments for Östergötland.")
+            logger.info("No BRAINVILLE_API_KEY set. Providing mock consultant assignments for Östergötland & E4 Syd.")
             return self._generate_mock_requests()
 
     def _fetch_live_api(self) -> List[Dict[str, Any]]:
@@ -66,7 +66,7 @@ class BrainvilleClient:
         return leads
 
     def _generate_mock_requests(self) -> List[Dict[str, Any]]:
-        """Realistic sample consultant assignments tailored for Östergötland tech landscape."""
+        """Realistic sample consultant assignments tailored for Östergötland, Nyköping & Södertälje."""
         now = datetime.utcnow()
         return [
             {
@@ -153,5 +153,46 @@ class BrainvilleClient:
                 "published_at": now - timedelta(hours=18),
                 "deadline": now + timedelta(days=20),
             },
+            {
+                "source": "brainville",
+                "external_id": "bv-sod-201",
+                "title": "Embedded Automotive & Diagnostics Specialist (C++ / AUTOSAR)",
+                "company_name": "Fordonskoncern Södertälje (Scania-kluster)",
+                "description": "Konsultuppdrag för mjukvaruutveckling inom elektrifiering och tunga fordon. Kräver djup kompetens inom C++, Linux, CAN-buss, AUTOSAR och diagnostikverktyg.",
+                "location": "Södertälje",
+                "municipality_code": "0181",
+                "region": "Stockholms län",
+                "url": "https://www.brainville.com/assignment/bv-sod-201",
+                "is_consultant_assignment": True,
+                "published_at": now - timedelta(days=1),
+                "deadline": now + timedelta(days=12),
+            },
+            {
+                "source": "brainville",
+                "external_id": "bv-sod-202",
+                "title": "Cloud Platform Architect (AWS / Kubernetes) Life Science",
+                "company_name": "Läkemedels- och Bioteknikbolag Södertälje",
+                "description": "Vi söker en erfaren Cloud Architect för att designa validerade molnmiljöer i AWS och Kubernetes för hantering av kliniska forskningsdata. GxP och säkerhetsefterlevnad är meriterande.",
+                "location": "Södertälje",
+                "municipality_code": "0181",
+                "region": "Stockholms län",
+                "url": "https://www.brainville.com/assignment/bv-sod-202",
+                "is_consultant_assignment": True,
+                "published_at": now - timedelta(days=2),
+                "deadline": now + timedelta(days=16),
+            },
+            {
+                "source": "brainville",
+                "external_id": "bv-nyk-301",
+                "title": "Fullstack .NET / Cloud Utvecklare",
+                "company_name": "Offentlig verksamhet & Industri Nyköping",
+                "description": "Konsultförfrågan för vidareutveckling av verksamhetsnära system i C#, .NET 8 och Azure. Integration med SQL-databaser och moderna frontend-gränssnitt i React.",
+                "location": "Nyköping",
+                "municipality_code": "0480",
+                "region": "Södermanlands län",
+                "url": "https://www.brainville.com/assignment/bv-nyk-301",
+                "is_consultant_assignment": True,
+                "published_at": now - timedelta(days=3),
+                "deadline": now + timedelta(days=10),
+            },
         ]
-
