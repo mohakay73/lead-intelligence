@@ -562,7 +562,7 @@ with tab_leads:
 # ----------------- TAB 3: HISTORISKA TRENDER & FRAMTIDSUTSIKTER -----------------
 with tab_trends:
     st.markdown("##### Historisk marknadsutveckling & framtidsspaning (2024–2026)")
-    st.caption("Djupanalys baserad på över 1 500 historiska IT-annonser i Östergötland, Södertälje och Nyköping.")
+    st.caption("Djupanalys baserad på över 2 000 historiska IT-annonser i Östergötland, Södertälje och Nyköping.")
 
     # 1. Top row: Monthly volume trend + Seasonality
     col_t1, col_t2 = st.columns([3, 2])
