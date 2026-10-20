@@ -101,7 +101,7 @@ def format_markdown_digest(data: Dict[str, Any]) -> str:
         consultant_lines.append(f"- **{c['title']}** ({c['company']} | {c['location']}){url_part}\n  _Kompetenser: {skills_str}_")
     consultant_block = "\n".join(consultant_lines)
 
-    return f"""# Veckorapport: Marknadsintelligens Östergötland & E4 Syd
+    return f"""# Veckorapport: Marknadsintelligens Östergötland, Södertälje & Nyköping
 **Datum:** {data['report_date']} | **Område:** Linköping, Norrköping, Södertälje, Nyköping
 
 ---
@@ -162,7 +162,7 @@ def format_html_digest(data: Dict[str, Any]) -> str:
     <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1px solid #e2e8f0;">
         <div style="background:#0f172a;color:#ffffff;padding:24px 28px;">
             <div style="font-size:20px;font-weight:800;letter-spacing:-0.02em;">Ledningsrapport: Marknadsintelligens</div>
-            <div style="font-size:13px;color:#94a3b8;margin-top:4px;">Östergötland & E4 Syd &bull; Linköping, Norrköping, Södertälje, Nyköping &bull; {data['report_date']}</div>
+            <div style="font-size:13px;color:#94a3b8;margin-top:4px;">Östergötland, Södertälje & Nyköping &bull; {data['report_date']}</div>
         </div>
         <div style="padding:24px 28px;">
             <div style="display:flex;gap:12px;margin-bottom:24px;">

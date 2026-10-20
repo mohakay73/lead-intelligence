@@ -22,7 +22,7 @@ class BrainvilleClient:
         if self.api_key:
             return self._fetch_live_api()
         else:
-            logger.info("No BRAINVILLE_API_KEY set. Providing mock consultant assignments for Östergötland & E4 Syd.")
+            logger.info("No BRAINVILLE_API_KEY set. Providing mock consultant assignments for Östergötland, Södertälje & Nyköping.")
             return self._generate_mock_requests()
 
     def _fetch_live_api(self) -> List[Dict[str, Any]]:

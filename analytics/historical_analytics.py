@@ -1,7 +1,7 @@
 """
 Historical Market Trend & Forecasting Analytics.
 Analyzes long-term trends, skill growth trajectories, and seasonal patterns
-across Östergötland & E4 Syd (2024 - present).
+across Östergötland, Södertälje & Nyköping (2024 - present).
 """
 from typing import Dict, Any, List
 import pandas as pd
@@ -162,3 +162,4 @@ def get_seasonal_pattern(db: Session, location: str = "Alla") -> pd.DataFrame:
         data.append({"month_num": int(m_num), "month_name": month_names.get(int(m_num), str(m_num)), "count": cnt})
 
     return pd.DataFrame(data)
+

@@ -315,7 +315,7 @@ st.markdown(
     <div class="header-container">
         <div>
             <div class="header-title">Marknadsintelligens & Beslutsstöd</div>
-            <div class="header-subtitle">IT- och teknikmarknaden i Östergötland & E4 Syd (Linköping, Norrköping, Södertälje, Nyköping)</div>
+            <div class="header-subtitle">IT- och teknikmarknaden i Östergötland, Södertälje & Nyköping</div>
         </div>
         <div>
             <div class="status-badge">
@@ -387,10 +387,10 @@ with tab_market:
             )
             fig.update_layout(
                 yaxis={"categoryorder": "total ascending"},
-                height=460,
+                height=480,
                 font={"family": "Inter, sans-serif"},
-                margin=dict(l=10, r=20, t=40, b=20),
-                legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5),
+                margin=dict(l=10, r=20, t=50, b=50),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
             )
             st.plotly_chart(fig, use_container_width=True, theme="streamlit")
         else:
@@ -403,7 +403,7 @@ with tab_market:
                 loc_df,
                 values="count",
                 names="location",
-                title="Geografisk fördelning (Östergötland & E4 Syd)",
+                title="Geografisk fördelning (Östergötland, Södertälje & Nyköping)",
                 hole=0.55,
                 color_discrete_sequence=["#2563eb", "#3b82f6", "#10b981", "#06b6d4", "#f59e0b", "#8b5cf6", "#ec4899", "#cbd5e1"],
             )
@@ -745,7 +745,7 @@ with tab_strategy:
                 Scania- och AstraZeneca-klustren i Södertälje samt industrin kring Nyköping skapar stor efterfrågan inom fordonsprogramvara (AUTOSAR, C++, diagnostik, Linux) och validerade Life Science-molnplattformar.
             </div>
             <div class="action-note">
-                <strong>Ledningsåtgärd:</strong> Rikta konsultbearbetning mot fordons- och automationsbolag i E4 Syd-korridoren som komplement till Mjärdevi- och SAAB-affärerna.
+                <strong>Ledningsåtgärd:</strong> Rikta konsultbearbetning mot fordons- och automationsbolag i Södertälje- och Nyköpingsregionen som komplement till Mjärdevi- och SAAB-affärerna.
             </div>
         </div>
         """,
