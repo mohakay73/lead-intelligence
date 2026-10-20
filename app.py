@@ -585,6 +585,7 @@ with tab_trends:
                 margin=dict(l=10, r=20, t=40, b=20),
             )
             st.plotly_chart(fig_vol, use_container_width=True, theme="streamlit")
+            st.caption("Månatlig volym från JobTech Historical API (2024–2026-09) samt dagsaktuellt realtidsflöde för pågående månad (2026-10).")
         else:
             st.info("Ingen historisk volymdata tillgänglig för valt filter.")
 

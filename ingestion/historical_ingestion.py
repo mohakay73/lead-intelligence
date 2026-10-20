@@ -83,7 +83,8 @@ def parse_date(date_str: str) -> datetime:
 
 def run_historical_pipeline(
     start_year: int = 2024,
-    end_year: int = 2025,
+    end_year: int = 2026,
+    end_month: int = 9,
     samples_per_month: int = 40,
 ) -> Dict[str, Any]:
     """
@@ -102,6 +103,9 @@ def run_historical_pipeline(
     # Month by month iteration
     for year in range(start_year, end_year + 1):
         for month in range(1, 13):
+            if year == end_year and month > end_month:
+                break
+
             # Format month start and end
             start_date = f"{year}-{month:02d}-01"
             if month in [1, 3, 5, 7, 8, 10, 12]:
@@ -171,3 +175,4 @@ def run_historical_pipeline(
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     run_historical_pipeline(start_year=2024, end_year=2025, samples_per_month=35)
+
