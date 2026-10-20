@@ -335,7 +335,7 @@ st.markdown(
         <div class="metric-box">
             <div class="metric-caption">Totala aktiva behov</div>
             <div class="metric-number">{kpis['total_leads']}</div>
-            <div class="metric-detail">Östergötlands samlade marknad</div>
+            <div class="metric-detail">Östergötland, Södertälje & Nyköping</div>
         </div>
         <div class="metric-box">
             <div class="metric-caption">Konsultförfrågningar</div>
@@ -397,7 +397,7 @@ with tab_market:
             st.info("Ingen kompetensdata tillgänglig för det valda filtret.")
 
     with col_geo:
-        loc_df = get_location_distribution(db)
+        loc_df = get_location_distribution(db, source=selected_source)
         if not loc_df.empty:
             fig_loc = px.pie(
                 loc_df,
@@ -449,7 +449,7 @@ with tab_market:
             
     with col_cat:
         st.markdown("##### Fördelning per teknikområde")
-        cat_df = get_category_distribution(db)
+        cat_df = get_category_distribution(db, location=selected_location, source=selected_source)
         if not cat_df.empty:
             fig_cat = px.pie(
                 cat_df,
@@ -763,7 +763,7 @@ with tab_digest:
 
     col_d1, col_d2, col_d3 = st.columns(3)
     with col_d1:
-        st.metric("Totala Aktiva Uppdrag", f"{digest_data['total_active']} st")
+        st.metric("Totala Aktiva Behov", f"{digest_data['total_active']} st")
     with col_d2:
         st.metric("Direkta Konsultuppdrag", f"{digest_data['consultant_leads']} st")
     with col_d3:

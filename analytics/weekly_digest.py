@@ -20,38 +20,49 @@ logger = logging.getLogger("WeeklyDigest")
 
 
 def build_weekly_intelligence_data(db: Session, days_back: int = 7) -> Dict[str, Any]:
-    """Compiles weekly metrics and highlights from the database."""
+    """Compiles weekly metrics and highlights from the database for active leads."""
     cutoff = datetime.now() - timedelta(days=days_back)
 
-    total_active = db.query(func.count(Lead.id)).scalar() or 0
-    new_this_week = db.query(func.count(Lead.id)).filter(Lead.published_at >= cutoff).scalar() or 0
-    consultant_leads = db.query(func.count(Lead.id)).filter(Lead.is_consultant_assignment == True).scalar() or 0
+    total_active = db.query(func.count(Lead.id)).filter(Lead.source != "historical").scalar() or 0
+    new_this_week = (
+        db.query(func.count(Lead.id))
+        .filter(Lead.published_at >= cutoff, Lead.source != "historical")
+        .scalar()
+        or 0
+    )
+    consultant_leads = (
+        db.query(func.count(Lead.id))
+        .filter(Lead.is_consultant_assignment == True, Lead.source != "historical")
+        .scalar()
+        or 0
+    )
 
-    # Locations
+    # Locations (active leads)
     location_counts = (
         db.query(Lead.location, func.count(Lead.id))
-        .filter(Lead.location.isnot(None))
+        .filter(Lead.location.isnot(None), Lead.source != "historical")
         .group_by(Lead.location)
         .order_by(func.count(Lead.id).desc())
         .limit(6)
         .all()
     )
 
-    # Top skills
+    # Top skills (active leads)
     top_skills = (
         db.query(Skill.name, Skill.category, func.count(Lead.id))
         .join(lead_skills, Skill.id == lead_skills.c.skill_id)
         .join(Lead, Lead.id == lead_skills.c.lead_id)
+        .filter(Lead.source != "historical")
         .group_by(Skill.name, Skill.category)
         .order_by(func.count(Lead.id).desc())
         .limit(6)
         .all()
     )
 
-    # Top employers
+    # Top employers (active leads)
     top_employers = (
         db.query(Lead.company_name, Lead.location, func.count(Lead.id))
-        .filter(Lead.company_name.isnot(None))
+        .filter(Lead.company_name.isnot(None), Lead.source != "historical")
         .group_by(Lead.company_name, Lead.location)
         .order_by(func.count(Lead.id).desc())
         .limit(6)
@@ -61,7 +72,7 @@ def build_weekly_intelligence_data(db: Session, days_back: int = 7) -> Dict[str,
     # High-priority consultant assignments (direct leads)
     consultant_highlights = (
         db.query(Lead)
-        .filter(Lead.is_consultant_assignment == True)
+        .filter(Lead.is_consultant_assignment == True, Lead.source != "historical")
         .order_by(Lead.published_at.desc().nullslast())
         .limit(5)
         .all()

@@ -68,15 +68,23 @@ def get_skill_demand(
     return pd.DataFrame(results, columns=["skill", "category", "count"])
 
 
-def get_location_distribution(db: Session) -> pd.DataFrame:
-    """Returns distribution of leads across Östergötland municipalities."""
-    results = (
+def get_location_distribution(db: Session, source: Optional[str] = None) -> pd.DataFrame:
+    """Returns distribution of active leads across municipalities."""
+    query = (
         db.query(
             Lead.location.label("location"),
             func.count(Lead.id).label("count"),
         )
         .filter(Lead.location.isnot(None))
-        .group_by(Lead.location)
+    )
+
+    if source and source != "Alla":
+        query = query.filter(Lead.source == source)
+    else:
+        query = query.filter(Lead.source != "historical")
+
+    results = (
+        query.group_by(Lead.location)
         .order_by(func.count(Lead.id).desc())
         .limit(10)
         .all()
@@ -88,16 +96,31 @@ def get_location_distribution(db: Session) -> pd.DataFrame:
     return pd.DataFrame(results, columns=["location", "count"])
 
 
-def get_category_distribution(db: Session) -> pd.DataFrame:
-    """Aggregates demand by broader technology category."""
-    results = (
+def get_category_distribution(
+    db: Session,
+    location: Optional[str] = None,
+    source: Optional[str] = None,
+) -> pd.DataFrame:
+    """Aggregates demand by broader technology category for active leads."""
+    query = (
         db.query(
             Skill.category.label("category"),
             func.count(Lead.id).label("count"),
         )
         .join(lead_skills, Skill.id == lead_skills.c.skill_id)
         .join(Lead, Lead.id == lead_skills.c.lead_id)
-        .group_by(Skill.category)
+    )
+
+    if location and location != "Alla":
+        query = query.filter(Lead.location.ilike(f"%{location}%"))
+
+    if source and source != "Alla":
+        query = query.filter(Lead.source == source)
+    else:
+        query = query.filter(Lead.source != "historical")
+
+    results = (
+        query.group_by(Skill.category)
         .order_by(func.count(Lead.id).desc())
         .all()
     )
