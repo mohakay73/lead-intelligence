@@ -6,11 +6,21 @@ from database.models import Lead, Skill, lead_skills
 
 
 def get_overview_kpis(db: Session) -> Dict[str, Any]:
-    """Calculates top-level executive metrics."""
-    total_leads = db.query(func.count(Lead.id)).scalar() or 0
-    consultant_leads = db.query(func.count(Lead.id)).filter(Lead.is_consultant_assignment == True).scalar() or 0
+    """Calculates top-level executive metrics for active opportunities."""
+    total_leads = db.query(func.count(Lead.id)).filter(Lead.source != "historical").scalar() or 0
+    consultant_leads = (
+        db.query(func.count(Lead.id))
+        .filter(Lead.is_consultant_assignment == True, Lead.source != "historical")
+        .scalar()
+        or 0
+    )
     jobtech_leads = db.query(func.count(Lead.id)).filter(Lead.source == "jobtech").scalar() or 0
-    unique_employers = db.query(func.count(func.distinct(Lead.company_name))).scalar() or 0
+    unique_employers = (
+        db.query(func.count(func.distinct(Lead.company_name)))
+        .filter(Lead.source != "historical")
+        .scalar()
+        or 0
+    )
 
     return {
         "total_leads": total_leads,
@@ -42,6 +52,8 @@ def get_skill_demand(
 
     if source and source != "Alla":
         query = query.filter(Lead.source == source)
+    else:
+        query = query.filter(Lead.source != "historical")
 
     results = (
         query.group_by(Skill.name, Skill.category)
@@ -117,6 +129,8 @@ def get_top_employers(
 
     if source and source != "Alla":
         query = query.filter(Lead.source == source)
+    else:
+        query = query.filter(Lead.source != "historical")
 
     results = (
         query.group_by(Lead.company_name, Lead.location)
@@ -147,6 +161,8 @@ def get_filtered_leads(
 
     if source and source != "Alla":
         query = query.filter(Lead.source == source)
+    else:
+        query = query.filter(Lead.source != "historical")
 
     if search_term:
         term = f"%{search_term}%"

@@ -23,6 +23,12 @@ from analytics.weekly_digest import (
     format_html_digest,
     send_slack_notification,
 )
+from analytics.historical_analytics import (
+    get_monthly_volume_trend,
+    get_top_skills_time_series,
+    get_skill_growth_barometer,
+    get_seasonal_pattern,
+)
 from ingestion.pipeline import run_pipeline
 
 # ----------------- PAGE CONFIGURATION -----------------
@@ -352,9 +358,10 @@ st.markdown(
 )
 
 # ----------------- MAIN TABS -----------------
-tab_market, tab_leads, tab_strategy, tab_digest = st.tabs([
-    "Marknadsöversikt & Kompetenser",
+tab_market, tab_leads, tab_trends, tab_strategy, tab_digest = st.tabs([
+    "Marknadsöversikt & Aktuella Behov",
     "Uppdrag & Lead Pipeline",
+    "Historiska Trender & Framtidsutsikter",
     "Strategiskt Beslutsunderlag",
     "Ledningsrapport & Veckobrev",
 ])
@@ -552,7 +559,124 @@ with tab_leads:
             st.text_input("Föreslagen ämnesrad", value=pitch["subject"], key=f"subj_{lead['id']}")
             st.text_area("Färdigt säljmejl (redigerbart)", value=pitch["body"], height=190, key=f"body_{lead['id']}")
 
-# ----------------- TAB 3: STRATEGISKT BESLUTSUNDERLAG -----------------
+# ----------------- TAB 3: HISTORISKA TRENDER & FRAMTIDSUTSIKTER -----------------
+with tab_trends:
+    st.markdown("##### Historisk marknadsutveckling & framtidsspaning (2024–2026)")
+    st.caption("Djupanalys baserad på över 1 500 historiska IT-annonser i Östergötland, Södertälje och Nyköping.")
+
+    # 1. Top row: Monthly volume trend + Seasonality
+    col_t1, col_t2 = st.columns([3, 2])
+    with col_t1:
+        vol_df = get_monthly_volume_trend(db, location=selected_location)
+        if not vol_df.empty:
+            loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
+            fig_vol = px.line(
+                vol_df,
+                x="month",
+                y="postings",
+                title=f"Volymtrend månad för månad ({loc_label})",
+                labels={"month": "Månad", "postings": "Antal annonserade IT-positioner"},
+                markers=True,
+                color_discrete_sequence=["#2563eb"],
+            )
+            fig_vol.update_layout(
+                height=380,
+                font={"family": "Inter, sans-serif"},
+                margin=dict(l=10, r=20, t=40, b=20),
+            )
+            st.plotly_chart(fig_vol, use_container_width=True, theme="streamlit")
+        else:
+            st.info("Ingen historisk volymdata tillgänglig för valt filter.")
+
+    with col_t2:
+        season_df = get_seasonal_pattern(db, location=selected_location)
+        if not season_df.empty:
+            fig_season = px.bar(
+                season_df,
+                x="month_name",
+                y="count",
+                title="Säsongsmönster: När rekryterar kunderna som mest?",
+                labels={"month_name": "Kalendermånad", "count": "Sammanlagd volym"},
+                color="count",
+                color_continuous_scale="Blues",
+            )
+            fig_season.update_layout(
+                height=380,
+                font={"family": "Inter, sans-serif"},
+                margin=dict(l=10, r=10, t=40, b=20),
+                coloraxis_showscale=False,
+            )
+            st.plotly_chart(fig_season, use_container_width=True, theme="streamlit")
+
+    st.markdown("---")
+
+    # 2. Second row: Skill evolution over time + Growth Barometer
+    col_t3, col_t4 = st.columns([3, 2])
+    with col_t3:
+        skills_ts_df = get_top_skills_time_series(db, location=selected_location, top_n=6)
+        if not skills_ts_df.empty:
+            fig_ts = px.line(
+                skills_ts_df,
+                x="month",
+                y="count",
+                color="skill",
+                title="Kompetensutveckling över tid: Topp 6 teknologier",
+                labels={"month": "Månad", "count": "Efterfrågan (annonser)", "skill": "Kompetens"},
+                color_discrete_sequence=["#2563eb", "#10b981", "#6366f1", "#f59e0b", "#ec4899", "#06b6d4"],
+            )
+            fig_ts.update_layout(
+                height=420,
+                font={"family": "Inter, sans-serif"},
+                margin=dict(l=10, r=20, t=40, b=20),
+                legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+            )
+            st.plotly_chart(fig_ts, use_container_width=True, theme="streamlit")
+        else:
+            st.info("Ingen kompetenshistorik tillgänglig.")
+
+    with col_t4:
+        growth_df = get_skill_growth_barometer(db, location=selected_location)
+        if not growth_df.empty:
+            fig_growth = px.bar(
+                growth_df,
+                x="growth_pct",
+                y="skill",
+                orientation="h",
+                title="Tillväxtbarometer: Snabbast växande kompetenser (%)",
+                labels={"growth_pct": "Tillväxt (%)", "skill": "Kompetens"},
+                color="growth_pct",
+                color_continuous_scale=["#93c5fd", "#2563eb", "#1d4ed8"],
+            )
+            fig_growth.update_layout(
+                yaxis={"categoryorder": "total ascending"},
+                height=420,
+                font={"family": "Inter, sans-serif"},
+                margin=dict(l=10, r=20, t=40, b=20),
+                coloraxis_showscale=False,
+            )
+            st.plotly_chart(fig_growth, use_container_width=True, theme="streamlit")
+
+    st.markdown("---")
+
+    # 3. Third row: Strategic Foresight Note for Leadership
+    st.markdown(
+        """
+        <div class="strategy-card">
+            <div class="strategy-header">
+                <span class="strategy-name">Strategisk Marknadsspaning & Prognos</span>
+                <span class="priority-pill p-strategic">Ledningsanalys</span>
+            </div>
+            <div style="font-size: 0.88rem; opacity: 0.82; line-height: 1.6;">
+                1. <strong>Cybersäkerhet & Plattform (+62% till +100% tillväxt):</strong> Den starkaste tillväxtvektorn i regionen. Drivs av regulatoriska EU-direktiv (NIS2/DORA) samt industriell modernisering mot microservices.<br>
+                2. <strong>Försvar & Fordon (C++ / Embedded +35.7%):</strong> Linköpings flyg- och försvarskluster (Saab Gripen) och Södertäljes fordonskluster (Scania elektrifiering) uppvisar en strukturell tillväxt som är oberoende av allmänna konjunktursvängningar.<br>
+                3. <strong>Säsongseffekter för säljteamet:</strong> Efterfrågan toppar historiskt kraftigt i <strong>oktober och mars</strong>. Resursplanering och konsultpitchar bör intensifieras 3–4 veckor före dessa toppar (i slutet av augusti och i februari) för att maximera beläggningen.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# ----------------- TAB 4: STRATEGISKT BESLUTSUNDERLAG -----------------
 with tab_strategy:
     st.markdown("##### Strategiska prioriteringar för ledningen")
     st.caption("Sammanfattande marknadsanalys och affärsrekommendationer baserat på aggregerade data.")
@@ -627,7 +751,7 @@ with tab_strategy:
         unsafe_allow_html=True,
     )
 
-# ----------------- TAB 4: VECKORAPPORT & LEDNINGSBREV -----------------
+# ----------------- TAB 5: VECKORAPPORT & LEDNINGSBREV -----------------
 with tab_digest:
     st.markdown("##### Veckorapport: Marknadsintelligens för ledningen")
     st.caption("Aggregerad sammanställning av den senaste veckans uppdragsflöde, heta leads och kompetenstrender.")

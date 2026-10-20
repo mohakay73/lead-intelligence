@@ -81,3 +81,4 @@ def _format_skill_bullets(skills: list) -> str:
     for s in skills[:5]:
         bullets.append(f"• Dokumenterad erfarenhet inom {s}")
     return "\n".join(bullets)
+
