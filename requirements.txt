@@ -1,6 +1,7 @@
 requests>=2.31.0
 pydantic>=2.5.0
 sqlalchemy>=2.0.25
+psycopg[binary]>=3.1.18
 psycopg2-binary>=2.9.9
 streamlit>=1.31.0
 pandas>=2.1.0
