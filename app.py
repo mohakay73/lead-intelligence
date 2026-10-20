@@ -5,6 +5,9 @@ import plotly.graph_objects as go
 from datetime import datetime
 from database.connection import init_db, SessionLocal
 from database.models import Skill, Lead
+import importlib
+import analytics.trend_engine
+importlib.reload(analytics.trend_engine)
 from analytics.trend_engine import (
     get_overview_kpis,
     get_skill_demand,
