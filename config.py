@@ -9,7 +9,16 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 # Database URL: default to SQLite for instant local runs, or PostgreSQL for Azure/Supabase
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'leads.db'}")
+raw_db_url = os.getenv("DATABASE_URL", "").strip().strip('"').strip("'")
+if raw_db_url.startswith("DATABASE_URL="):
+    raw_db_url = raw_db_url.split("DATABASE_URL=", 1)[1].strip().strip('"').strip("'")
+
+if not raw_db_url:
+    DATABASE_URL = f"sqlite:///{BASE_DIR / 'leads.db'}"
+elif raw_db_url.startswith("postgres://"):
+    DATABASE_URL = raw_db_url.replace("postgres://", "postgresql://", 1)
+else:
+    DATABASE_URL = raw_db_url
 
 # JobTech API (Arbetsförmedlingen Open Data)
 JOBTECH_API_URL = os.getenv("JOBTECH_API_URL", "https://jobsearch.api.jobtechdev.se")
@@ -39,4 +48,3 @@ TARGET_MUNICIPALITIES = {
 
 # JobTech Taxonomy occupation-field for IT / Data
 IT_OCCUPATION_FIELD = "apaJ_2ja_LuF"
-

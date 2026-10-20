@@ -1,5 +1,6 @@
 import logging
 from typing import Dict, Any
+from config import DATABASE_URL
 from database.connection import init_db, SessionLocal
 from database.models import Lead, Skill
 from ingestion.jobtech_client import JobTechClient
@@ -16,6 +17,14 @@ def run_pipeline() -> Dict[str, Any]:
     Returns summary statistics.
     """
     logger.info("Starting ingestion pipeline...")
+    # Mask connection details for logging
+    target_display = DATABASE_URL
+    if "@" in target_display:
+        parts = target_display.split("@")
+        scheme = target_display.split("://")[0]
+        target_display = f"{scheme}://***@{parts[-1]}"
+    logger.info(f"Target database: {target_display}")
+
     init_db()
     db = SessionLocal()
 
@@ -107,4 +116,3 @@ def run_pipeline() -> Dict[str, Any]:
 
 if __name__ == "__main__":
     run_pipeline()
-
