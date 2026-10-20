@@ -406,25 +406,28 @@ with tab_market:
     
     with col_emp:
         st.markdown("##### Mest aktiva uppdragsgivare")
-        top_emp_df = get_top_employers(db, limit=10)
+        top_emp_df = get_top_employers(db, location=selected_location, source=selected_source, limit=15)
         if not top_emp_df.empty:
+            loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
             fig_emp = px.bar(
                 top_emp_df,
                 x="count",
                 y="company",
                 orientation="h",
                 color="location",
-                title="Organisationer med flest öppna förfrågningar",
+                title=f"Organisationer med flest öppna förfrågningar ({loc_label})",
                 labels={"company": "Organisation", "count": "Antal behov", "location": "Ort"},
-                color_discrete_sequence=["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"],
+                color_discrete_sequence=["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"],
             )
             fig_emp.update_layout(
                 yaxis={"categoryorder": "total ascending"},
-                height=380,
+                height=420,
                 font={"family": "Inter, sans-serif"},
                 margin=dict(l=10, r=20, t=40, b=20),
             )
             st.plotly_chart(fig_emp, use_container_width=True, theme="streamlit")
+        else:
+            st.info("Inga arbetsgivare matchar det valda filtret.")
             
     with col_cat:
         st.markdown("##### Fördelning per teknikområde")

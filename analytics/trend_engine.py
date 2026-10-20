@@ -96,16 +96,30 @@ def get_category_distribution(db: Session) -> pd.DataFrame:
     return pd.DataFrame(results, columns=["category", "count"])
 
 
-def get_top_employers(db: Session, limit: int = 10) -> pd.DataFrame:
+def get_top_employers(
+    db: Session,
+    location: Optional[str] = None,
+    source: Optional[str] = None,
+    limit: int = 15,
+) -> pd.DataFrame:
     """Returns the most active hiring organizations and brokers in the region."""
-    results = (
+    query = (
         db.query(
             Lead.company_name.label("company"),
             Lead.location.label("location"),
             func.count(Lead.id).label("count"),
         )
         .filter(Lead.company_name.isnot(None))
-        .group_by(Lead.company_name, Lead.location)
+    )
+
+    if location and location != "Alla":
+        query = query.filter(Lead.location.ilike(f"%{location}%"))
+
+    if source and source != "Alla":
+        query = query.filter(Lead.source == source)
+
+    results = (
+        query.group_by(Lead.company_name, Lead.location)
         .order_by(func.count(Lead.id).desc())
         .limit(limit)
         .all()
@@ -159,4 +173,3 @@ def get_filtered_leads(
             "description": l.description,
         })
     return output
-
