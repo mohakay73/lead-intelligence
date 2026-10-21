@@ -259,17 +259,53 @@ st.markdown(
 init_db()
 db = SessionLocal()
 
+# ----------------- VIEW STATE & SYNC -----------------
+FUNCTION_VIEWS = [
+    "Marknadsöversikt & Aktuella Behov",
+    "Uppdrag & Lead Pipeline",
+    "Prediktiv Prognos & Kompetensradar",
+    "Historiska Trender (2022–2026)",
+    "Strategiskt Beslutsunderlag",
+    "Ledningsrapport & Veckobrev",
+]
+
+if "app_view" not in st.session_state:
+    st.session_state.app_view = FUNCTION_VIEWS[0]
+if "sidebar_view_choice" not in st.session_state:
+    st.session_state.sidebar_view_choice = FUNCTION_VIEWS[0]
+if "top_nav_select" not in st.session_state:
+    st.session_state.top_nav_select = FUNCTION_VIEWS[0]
+
+def sync_view_from_sidebar():
+    st.session_state.app_view = st.session_state.sidebar_view_choice
+    st.session_state.top_nav_select = st.session_state.sidebar_view_choice
+
+def sync_view_from_top():
+    st.session_state.app_view = st.session_state.top_view_choice
+    st.session_state.sidebar_view_choice = st.session_state.top_view_choice
+
 # ----------------- SIDEBAR -----------------
 st.sidebar.markdown(
     """
-    <div style="padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid rgba(128,128,128,0.2);">
-        <div style="font-size: 0.95rem; font-weight: 700; color: inherit;">Lead Intelligence</div>
-        <div style="font-size: 0.78rem; opacity: 0.7; color: inherit;">Beslutsstöd Region Östergötland</div>
+    <div style="padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid rgba(128,128,128,0.2);">
+        <div style="font-size: 1.05rem; font-weight: 700; color: inherit;">Lead Intelligence</div>
+        <div style="font-size: 0.78rem; opacity: 0.7; color: inherit;">Östergötland, Södertälje & Nyköping</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
+st.sidebar.markdown("**Funktion & Arbetsvy**")
+st.sidebar.selectbox(
+    "Välj funktion (Rullgardinsmeny)",
+    FUNCTION_VIEWS,
+    index=FUNCTION_VIEWS.index(st.session_state.app_view),
+    key="sidebar_view_choice",
+    on_change=sync_view_from_sidebar,
+    label_visibility="collapsed",
+)
+
+st.sidebar.markdown("---")
 st.sidebar.markdown("**Filter**")
 
 selected_location = st.sidebar.selectbox(
@@ -363,18 +399,34 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ----------------- MAIN TABS -----------------
-tab_market, tab_leads, tab_forecast, tab_trends, tab_strategy, tab_digest = st.tabs([
-    "Marknadsöversikt & Aktuella Behov",
-    "Uppdrag & Lead Pipeline",
-    "Prediktiv Prognos & Kompetensradar",
-    "Historiska Trender (2022–2026)",
-    "Strategiskt Beslutsunderlag",
-    "Ledningsrapport & Veckobrev",
-])
+# ----------------- MAIN VIEW SELECTOR (ROLL-UP MENU) -----------------
+current_view = st.session_state.app_view
 
-# ----------------- TAB 1: MARKNADSÖVERSIKT -----------------
-with tab_market:
+col_nav_bar1, col_nav_bar2 = st.columns([3, 2])
+with col_nav_bar1:
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: baseline; gap: 8px; padding-top: 5px;">
+            <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; opacity: 0.6; letter-spacing: 0.05em;">Aktiv funktion:</span>
+            <span style="font-size: 1.25rem; font-weight: 700; color: inherit; letter-spacing: -0.01em;">{current_view}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with col_nav_bar2:
+    st.selectbox(
+        "Byt vy (Rullgardinsmeny)",
+        FUNCTION_VIEWS,
+        index=FUNCTION_VIEWS.index(current_view),
+        key="top_nav_select",
+        on_change=sync_view_from_top,
+        label_visibility="collapsed",
+    )
+
+st.markdown("""<div style="border-bottom: 1px solid rgba(128, 128, 128, 0.18); margin-top: 4px; margin-bottom: 24px;"></div>""", unsafe_allow_html=True)
+
+# ----------------- VIEW 1: MARKNADSÖVERSIKT -----------------
+if current_view == "Marknadsöversikt & Aktuella Behov":
     st.markdown("##### Efterfrågan per kompetens och geografi")
     
     col_chart, col_geo = st.columns([3, 2])
@@ -473,8 +525,8 @@ with tab_market:
             )
             st.plotly_chart(fig_cat, use_container_width=True, theme="streamlit")
 
-# ----------------- TAB 2: LEAD PIPELINE -----------------
-with tab_leads:
+# ----------------- VIEW 2: LEAD PIPELINE -----------------
+elif current_view == "Uppdrag & Lead Pipeline":
     st.markdown("##### Marknadsförfrågningar och uppdragsflöde")
     
     col_search, col_skill_filter, col_limit = st.columns([3, 2, 1])
@@ -566,8 +618,8 @@ with tab_leads:
             st.text_input("Föreslagen ämnesrad", value=pitch["subject"], key=f"subj_{lead['id']}")
             st.text_area("Färdigt säljmejl (redigerbart)", value=pitch["body"], height=190, key=f"body_{lead['id']}")
 
-# ----------------- TAB 3: PREDIKTIV PROGNOS & KOMPETENSRADAR -----------------
-with tab_forecast:
+# ----------------- VIEW 3: PREDIKTIV PROGNOS & KOMPETENSRADAR -----------------
+elif current_view == "Prediktiv Prognos & Kompetensradar":
     st.markdown("##### Prediktiv Marknadsprognos & Kompetensradar (6 Månader Framåt)")
     st.caption("AI/ML-tidsserieprognos med Holt-Winters säsongsmodell & momentum-analys tränad på 58 månaders data (2022–2026) sparad i Supabase.")
 
@@ -718,8 +770,8 @@ with tab_forecast:
                 run_forecast_and_save(db, location=selected_location)
                 st.rerun()
 
-# ----------------- TAB 4: HISTORISKA TRENDER -----------------
-with tab_trends:
+# ----------------- VIEW 4: HISTORISKA TRENDER -----------------
+elif current_view == "Historiska Trender (2022–2026)":
     st.markdown("##### Historisk marknadsutveckling (2022–2026)")
     st.caption("Djupanalys baserad på över 3 800 historiska IT-annonser i Östergötland, Södertälje och Nyköping.")
 
@@ -836,8 +888,8 @@ with tab_trends:
         unsafe_allow_html=True,
     )
 
-# ----------------- TAB 4: STRATEGISKT BESLUTSUNDERLAG -----------------
-with tab_strategy:
+# ----------------- VIEW 5: STRATEGISKT BESLUTSUNDERLAG -----------------
+elif current_view == "Strategiskt Beslutsunderlag":
     st.markdown("##### Strategiska prioriteringar för ledningen")
     st.caption("Sammanfattande marknadsanalys och affärsrekommendationer baserat på aggregerade data.")
     
@@ -911,8 +963,8 @@ with tab_strategy:
         unsafe_allow_html=True,
     )
 
-# ----------------- TAB 5: VECKORAPPORT & LEDNINGSBREV -----------------
-with tab_digest:
+# ----------------- VIEW 6: VECKORAPPORT & LEDNINGSBREV -----------------
+elif current_view == "Ledningsrapport & Veckobrev":
     st.markdown("##### Veckorapport: Marknadsintelligens för ledningen")
     st.caption("Aggregerad sammanställning av den senaste veckans uppdragsflöde, heta leads och kompetenstrender.")
 

@@ -36,3 +36,4 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           python -m analytics.forecast_engine
+
