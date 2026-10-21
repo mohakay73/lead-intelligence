@@ -1,7 +1,7 @@
 """
 Historical Market Trend & Forecasting Analytics.
 Analyzes long-term trends, skill growth trajectories, and seasonal patterns
-across Östergötland, Södertälje & Nyköping (2024 - present).
+across Östergötland, Södertälje & Nyköping (2022 - present).
 """
 from typing import Dict, Any, List
 import pandas as pd
@@ -32,7 +32,7 @@ def get_monthly_volume_trend(db: Session, location: str = "Alla") -> pd.DataFram
         return pd.DataFrame(columns=["month", "postings"])
 
     df = pd.DataFrame(results, columns=["month", "postings"])
-    return df[df["month"] >= "2024-01"]
+    return df[df["month"] >= "2022-01"]
 
 
 def get_top_skills_time_series(
@@ -89,7 +89,7 @@ def get_top_skills_time_series(
     )
 
     df = pd.DataFrame(results, columns=["month", "skill", "count"])
-    return df[df["month"] >= "2024-01"]
+    return df[df["month"] >= "2022-01"]
 
 
 def get_skill_growth_barometer(db: Session, location: str = "Alla") -> pd.DataFrame:

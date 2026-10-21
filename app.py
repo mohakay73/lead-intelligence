@@ -29,6 +29,10 @@ from analytics.historical_analytics import (
     get_skill_growth_barometer,
     get_seasonal_pattern,
 )
+from analytics.forecast_engine import (
+    get_forecast_display_data,
+    run_forecast_and_save,
+)
 from ingestion.pipeline import run_pipeline
 
 # ----------------- PAGE CONFIGURATION -----------------
@@ -299,9 +303,11 @@ if st.sidebar.button("Synkronisera data nu", use_container_width=True):
 
 st.sidebar.markdown(
     """
-    <div style="background: rgba(128, 128, 128, 0.06); border: 1px solid rgba(128, 128, 128, 0.16); border-radius: 6px; padding: 12px; margin-top: 16px; font-size: 0.75rem; opacity: 0.8; color: inherit; line-height: 1.4;">
-        <div style="font-weight: 600; margin-bottom: 2px;">Automatiserad drift</div>
-        GitHub Actions uppdaterar denna databas schemalagt varje vardagsmorgon kl. 07:00 CET.
+    <div style="background: rgba(128, 128, 128, 0.06); border: 1px solid rgba(128, 128, 128, 0.16); border-radius: 6px; padding: 12px; margin-top: 16px; font-size: 0.75rem; opacity: 0.8; color: inherit; line-height: 1.5;">
+        <div style="font-weight: 600; margin-bottom: 4px;">Automatiserad drift (GitHub Actions)</div>
+        • Marknadssynkning: Vardagar kl. 07:00 CET<br>
+        • Veckorapport: Måndagar kl. 07:30 CET<br>
+        • ML-modellträning: 1:a & 15:e i månaden
     </div>
     """,
     unsafe_allow_html=True,
@@ -358,10 +364,11 @@ st.markdown(
 )
 
 # ----------------- MAIN TABS -----------------
-tab_market, tab_leads, tab_trends, tab_strategy, tab_digest = st.tabs([
+tab_market, tab_leads, tab_forecast, tab_trends, tab_strategy, tab_digest = st.tabs([
     "Marknadsöversikt & Aktuella Behov",
     "Uppdrag & Lead Pipeline",
-    "Historiska Trender & Framtidsutsikter",
+    "Prediktiv Prognos & Kompetensradar",
+    "Historiska Trender (2022–2026)",
     "Strategiskt Beslutsunderlag",
     "Ledningsrapport & Veckobrev",
 ])
@@ -559,10 +566,162 @@ with tab_leads:
             st.text_input("Föreslagen ämnesrad", value=pitch["subject"], key=f"subj_{lead['id']}")
             st.text_area("Färdigt säljmejl (redigerbart)", value=pitch["body"], height=190, key=f"body_{lead['id']}")
 
-# ----------------- TAB 3: HISTORISKA TRENDER & FRAMTIDSUTSIKTER -----------------
+# ----------------- TAB 3: PREDIKTIV PROGNOS & KOMPETENSRADAR -----------------
+with tab_forecast:
+    st.markdown("##### Prediktiv Marknadsprognos & Kompetensradar (6 Månader Framåt)")
+    st.caption("AI/ML-tidsserieprognos med Holt-Winters säsongsmodell & momentum-analys tränad på 58 månaders data (2022–2026) sparad i Supabase.")
+
+    hist_df, fc_df, trending_skills = get_forecast_display_data(db, location=selected_location)
+
+    if not fc_df.empty:
+        avg_fc_vol = fc_df["predicted_volume"].mean()
+        peak_month_row = fc_df.loc[fc_df["predicted_volume"].idxmax()]
+        top_growth_skill = trending_skills[0] if trending_skills else None
+
+        col_fc1, col_fc2, col_fc3 = st.columns(3)
+        with col_fc1:
+            st.metric(
+                "Prognosticerad Snittvolym (Kommande 6 mån)",
+                f"{avg_fc_vol:.0f} st/mån",
+                delta=f"{fc_df['growth_mom_pct'].iloc[0]:+.1f}% startmånad",
+            )
+        with col_fc2:
+            st.metric(
+                "Förväntad Efterfrågetopp",
+                f"{peak_month_row['predicted_volume']:.0f} st",
+                help=f"Toppmånad: {peak_month_row['period']}",
+            )
+        with col_fc3:
+            if top_growth_skill:
+                st.metric(
+                    "Starkast Kompetenstillväxt",
+                    f"{top_growth_skill['skill']}",
+                    delta=f"+{top_growth_skill['growth_pct']:.0f}% momentum",
+                )
+            else:
+                st.metric("Kompetenstillväxt", "Beräknad", delta="Normal")
+
+        st.markdown("---")
+
+        # Forecast Line Chart with Confidence Interval
+        st.markdown("###### Volymutveckling & 6-månaders framtidsprognos (med konfidensintervall)")
+        
+        hist_subset = hist_df.tail(18).copy()
+        
+        fig_fc = go.Figure()
+
+        # Add Historical Line
+        fig_fc.add_trace(go.Scatter(
+            x=hist_subset["period"],
+            y=hist_subset["total_postings"],
+            mode="lines+markers",
+            name="Historisk volym (Utfall)",
+            line=dict(color="#2563eb", width=2.5),
+            marker=dict(size=6),
+        ))
+
+        # Bridge point: connect last historical point to first forecast point
+        bridge_x = [hist_subset["period"].iloc[-1]] + list(fc_df["period"])
+        bridge_y = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["predicted_volume"])
+        bridge_lower = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["ci_lower"])
+        bridge_upper = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["ci_upper"])
+
+        # Confidence Interval (Upper bound)
+        fig_fc.add_trace(go.Scatter(
+            x=bridge_x,
+            y=bridge_upper,
+            mode="lines",
+            line=dict(width=0),
+            showlegend=False,
+            hoverinfo="skip",
+        ))
+
+        # Confidence Interval (Lower bound filled to upper)
+        fig_fc.add_trace(go.Scatter(
+            x=bridge_x,
+            y=bridge_lower,
+            mode="lines",
+            line=dict(width=0),
+            fill="tonexty",
+            fillcolor="rgba(37, 99, 235, 0.12)",
+            name="80% Konfidensintervall (P10–P90)",
+            hoverinfo="skip",
+        ))
+
+        # Forecast Line
+        fig_fc.add_trace(go.Scatter(
+            x=bridge_x,
+            y=bridge_y,
+            mode="lines+markers",
+            name="Maskininlärningsprognos",
+            line=dict(color="#10b981", width=3, dash="dash"),
+            marker=dict(size=7, symbol="diamond"),
+        ))
+
+        loc_label = selected_location if selected_location != "Alla" else "Hela regionen (Östergötland, Södertälje & Nyköping)"
+        fig_fc.update_layout(
+            title=f"Marknadsprognos & Efterfrågebana ({loc_label})",
+            xaxis_title="Period (Månad)",
+            yaxis_title="Antal IT-behov / Uppdrag",
+            height=420,
+            font={"family": "Inter, sans-serif"},
+            margin=dict(l=10, r=20, t=40, b=20),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
+            hovermode="x unified",
+        )
+        st.plotly_chart(fig_fc, use_container_width=True, theme="streamlit")
+
+        st.markdown("---")
+
+        # Competency Momentum & Upskilling Matrix
+        st.markdown("###### Framtida Kompetensbehov & Vidareutbildningsrekommendationer (Upskilling Matrix)")
+        st.caption("Sorterat efter efterfrågeacceleration och tillväxt mellan perioderna. Ger ledningen direkt underlag för vilka certifieringar konsulter ska prioriteras inom.")
+
+        if trending_skills:
+            col_u1, col_u2 = st.columns([3, 2])
+            with col_u1:
+                skills_table_df = pd.DataFrame(trending_skills)
+                display_table = skills_table_df[["skill", "category", "current_volume", "growth_pct", "action"]].copy()
+                display_table.columns = ["Kompetens", "Kategori", "Aktuella behov (6m)", "Tillväxt (%)", "Strategisk Rekommendation"]
+                st.dataframe(
+                    display_table,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+            with col_u2:
+                st.markdown(
+                    """
+                    <div style="background: rgba(128, 128, 128, 0.05); border: 1px solid rgba(128, 128, 128, 0.15); border-radius: 8px; padding: 16px; font-size: 0.88rem; line-height: 1.6;">
+                        <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 8px;">Ledningsåtgärder för konsultteamet:</div>
+                        <strong>1. Investera & Certifiera:</strong> Konsulter på bänken eller med ledig tid bör omedelbart styras mot certifieringar inom <em>Terraform, Kubernetes (CKA) och Databricks</em>.<br>
+                        <strong>2. Rekryteringsfokus:</strong> Styr kravprofiler för seniorrekrytering mot Cloud Architecture och NIS2-säkerhet där tillväxttakten är som högst.<br>
+                        <strong>3. Kassakor:</strong> Bibehåll senior leverans inom etablerad systemutveckling (.NET, C#, C++, Python) som står för den stabila basvolymen.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        col_btn_retrain, col_btn_info = st.columns([1, 3])
+        with col_btn_retrain:
+            if st.button("Kör om ML-prognos nu", use_container_width=True):
+                with st.spinner("Tränar om tidsserie- och momentummodeller..."):
+                    run_forecast_and_save(db, location=selected_location)
+                    st.success("Modell omtränad och prognos uppdaterad!")
+                    st.rerun()
+        with col_btn_info:
+            st.caption("Modellen tränas automatiskt varannan vecka via GitHub Actions. Klicka ovan för att manuellt framtvinga en omedelbar omräkning.")
+    else:
+        st.info("Ingen förberäknad prognos tillgänglig för det valda filtret. Klicka på knappen nedan för att generera den.")
+        if st.button("Generera prognos nu"):
+            with st.spinner("Tränar modell..."):
+                run_forecast_and_save(db, location=selected_location)
+                st.rerun()
+
+# ----------------- TAB 4: HISTORISKA TRENDER -----------------
 with tab_trends:
-    st.markdown("##### Historisk marknadsutveckling & framtidsspaning (2024–2026)")
-    st.caption("Djupanalys baserad på över 2 000 historiska IT-annonser i Östergötland, Södertälje och Nyköping.")
+    st.markdown("##### Historisk marknadsutveckling (2022–2026)")
+    st.caption("Djupanalys baserad på över 3 800 historiska IT-annonser i Östergötland, Södertälje och Nyköping.")
 
     # 1. Top row: Monthly volume trend + Seasonality
     col_t1, col_t2 = st.columns([3, 2])

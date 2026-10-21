@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import (
     Column,
     Integer,
+    Float,
     String,
     Text,
     DateTime,
@@ -64,3 +65,51 @@ class Lead(Base):
     def __repr__(self):
         return f"<Lead {self.title} at {self.company_name} ({self.source})>"
 
+
+
+class MarketFeature(Base):
+    __tablename__ = 'market_features'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    period = Column(String(7), nullable=False, index=True)  # YYYY-MM
+    location = Column(String(100), nullable=False, default='Alla', index=True)
+    total_postings = Column(Integer, nullable=False, default=0)
+    lag_1m = Column(Integer, nullable=True)
+    lag_2m = Column(Integer, nullable=True)
+    lag_3m = Column(Integer, nullable=True)
+    lag_12m = Column(Integer, nullable=True)
+    rolling_mean_3m = Column(Float, nullable=True)
+    rolling_mean_6m = Column(Float, nullable=True)
+    month_num = Column(Integer, nullable=False)
+    quarter = Column(Integer, nullable=False)
+    skill_distribution = Column(Text, nullable=True)  # JSON string of skill counts
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('period', 'location', name='uq_period_location'),
+    )
+
+    def __repr__(self):
+        return f'<MarketFeature {self.period} - {self.location}: {self.total_postings}>'
+
+
+class MarketForecast(Base):
+    __tablename__ = 'market_forecasts'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    forecast_month = Column(String(7), nullable=False, index=True)  # YYYY-MM
+    location = Column(String(100), nullable=False, default='Alla', index=True)
+    predicted_volume = Column(Float, nullable=False)
+    ci_lower = Column(Float, nullable=False)
+    ci_upper = Column(Float, nullable=False)
+    growth_mom_pct = Column(Float, nullable=True)
+    model_version = Column(String(50), default='v1.0')
+    trending_skills = Column(Text, nullable=True)  # JSON string of high-momentum skills
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('forecast_month', 'location', name='uq_forecast_period_location'),
+    )
+
+    def __repr__(self):
+        return f'<MarketForecast {self.forecast_month} - {self.location}: {self.predicted_volume:.1f}>'
