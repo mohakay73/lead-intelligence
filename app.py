@@ -14,7 +14,13 @@ from database.connection import init_db, SessionLocal
 from database.models import Skill, Lead
 import importlib
 import analytics.trend_engine
+import analytics.historical_analytics
+import analytics.feature_pipeline
+import analytics.forecast_engine
 importlib.reload(analytics.trend_engine)
+importlib.reload(analytics.historical_analytics)
+importlib.reload(analytics.feature_pipeline)
+importlib.reload(analytics.forecast_engine)
 from analytics.trend_engine import (
     get_overview_kpis,
     get_skill_demand,
@@ -1006,36 +1012,44 @@ elif current_view == "Marknadsprognos & Trender":
         with col_t1:
             loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
             st.markdown(f"###### Volymtrend månad för månad ({loc_label})")
-            vol_df = get_monthly_volume_trend(db, location=selected_location)
-            if not vol_df.empty:
-                fig_vol = px.line(
-                    vol_df,
-                    x="month",
-                    y="postings",
-                    labels={"month": "Månad", "postings": "Annonserade IT-positioner"},
-                    markers=True,
-                    color_discrete_sequence=["#2563eb"],
-                )
-                style_chart(fig_vol, height=360, show_legend=False)
-                st.plotly_chart(fig_vol, use_container_width=True)
-            else:
-                st.info("Ingen historisk volymdata tillgänglig för valt filter.")
+            try:
+                vol_df = get_monthly_volume_trend(db, location=selected_location)
+                if not vol_df.empty:
+                    fig_vol = px.line(
+                        vol_df,
+                        x="month",
+                        y="postings",
+                        labels={"month": "Månad", "postings": "Annonserade IT-positioner"},
+                        markers=True,
+                        color_discrete_sequence=["#2563eb"],
+                    )
+                    style_chart(fig_vol, height=360, show_legend=False)
+                    st.plotly_chart(fig_vol, use_container_width=True)
+                else:
+                    st.info("Ingen historisk volymdata tillgänglig för valt filter.")
+            except Exception as e:
+                st.warning(f"Kunde inte läsa volymtrend just nu: {e}")
 
         with col_t2:
             st.markdown("###### Säsongsmönster: När rekryterar kunderna som mest?")
-            season_df = get_seasonal_pattern(db, location=selected_location)
-            if not season_df.empty:
-                fig_season = px.bar(
-                    season_df,
-                    x="month_name",
-                    y="count",
-                    labels={"month_name": "Kalendermånad", "count": "Sammanlagd volym"},
-                    color="count",
-                    color_continuous_scale="Blues",
-                )
-                style_chart(fig_season, height=360, show_legend=False)
-                fig_season.update_layout(coloraxis_showscale=False)
-                st.plotly_chart(fig_season, use_container_width=True)
+            try:
+                season_df = get_seasonal_pattern(db, location=selected_location)
+                if not season_df.empty:
+                    fig_season = px.bar(
+                        season_df,
+                        x="month_name",
+                        y="count",
+                        labels={"month_name": "Kalendermånad", "count": "Sammanlagd volym"},
+                        color="count",
+                        color_continuous_scale="Blues",
+                    )
+                    style_chart(fig_season, height=360, show_legend=False)
+                    fig_season.update_layout(coloraxis_showscale=False)
+                    st.plotly_chart(fig_season, use_container_width=True)
+                else:
+                    st.info("Ingen säsongsdata tillgänglig.")
+            except Exception as e:
+                st.warning(f"Kunde inte läsa säsongsmönster: {e}")
 
         st.markdown("---")
 
@@ -1043,39 +1057,47 @@ elif current_view == "Marknadsprognos & Trender":
         col_t3, col_t4 = st.columns(2)
         with col_t3:
             st.markdown("###### Kompetensutveckling över tid: Topp 6 teknologier")
-            skills_ts_df = get_top_skills_time_series(db, location=selected_location, top_n=6)
-            if not skills_ts_df.empty:
-                fig_ts = px.line(
-                    skills_ts_df,
-                    x="month",
-                    y="count",
-                    color="skill",
-                    labels={"month": "Månad", "count": "Efterfrågan (annonser)", "skill": "Kompetens"},
-                    color_discrete_sequence=["#2563eb", "#10b981", "#6366f1", "#f59e0b", "#ec4899", "#06b6d4"],
-                )
-                style_chart(fig_ts, height=360, show_legend=True)
-                fig_ts.update_layout(legend=dict(orientation="h", yanchor="top", y=-0.25, xanchor="center", x=0.5, title=None))
-                st.plotly_chart(fig_ts, use_container_width=True)
-            else:
-                st.info("Ingen kompetenshistorik tillgänglig.")
+            try:
+                skills_ts_df = get_top_skills_time_series(db, location=selected_location, top_n=6)
+                if not skills_ts_df.empty:
+                    fig_ts = px.line(
+                        skills_ts_df,
+                        x="month",
+                        y="count",
+                        color="skill",
+                        labels={"month": "Månad", "count": "Efterfrågan (annonser)", "skill": "Kompetens"},
+                        color_discrete_sequence=["#2563eb", "#10b981", "#6366f1", "#f59e0b", "#ec4899", "#06b6d4"],
+                    )
+                    style_chart(fig_ts, height=360, show_legend=True)
+                    fig_ts.update_layout(legend=dict(orientation="h", yanchor="top", y=-0.25, xanchor="center", x=0.5, title=None))
+                    st.plotly_chart(fig_ts, use_container_width=True)
+                else:
+                    st.info("Ingen kompetenshistorik tillgänglig.")
+            except Exception as e:
+                st.warning(f"Kunde inte läsa kompetensutveckling: {e}")
 
         with col_t4:
             st.markdown("###### Tillväxtbarometer: Snabbast växande kompetenser (%)")
-            growth_df = get_skill_growth_barometer(db, location=selected_location)
-            if not growth_df.empty:
-                fig_growth = px.bar(
-                    growth_df,
-                    x="growth_pct",
-                    y="skill",
-                    orientation="h",
-                    labels={"growth_pct": "Tillväxt (%)", "skill": "Kompetens"},
-                    color="growth_pct",
-                    color_continuous_scale=["#93c5fd", "#2563eb", "#1d4ed8"],
-                )
-                fig_growth.update_layout(yaxis={"categoryorder": "total ascending"})
-                style_chart(fig_growth, height=360, show_legend=False)
-                fig_growth.update_layout(coloraxis_showscale=False)
-                st.plotly_chart(fig_growth, use_container_width=True)
+            try:
+                growth_df = get_skill_growth_barometer(db, location=selected_location)
+                if not growth_df.empty:
+                    fig_growth = px.bar(
+                        growth_df,
+                        x="growth_pct",
+                        y="skill",
+                        orientation="h",
+                        labels={"growth_pct": "Tillväxt (%)", "skill": "Kompetens"},
+                        color="growth_pct",
+                        color_continuous_scale=["#93c5fd", "#2563eb", "#1d4ed8"],
+                    )
+                    fig_growth.update_layout(yaxis={"categoryorder": "total ascending"})
+                    style_chart(fig_growth, height=360, show_legend=False)
+                    fig_growth.update_layout(coloraxis_showscale=False)
+                    st.plotly_chart(fig_growth, use_container_width=True)
+                else:
+                    st.info("Ingen tillväxtdata tillgänglig.")
+            except Exception as e:
+                st.warning(f"Kunde inte läsa tillväxtbarometer: {e}")
 
         st.markdown("---")
 
