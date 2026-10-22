@@ -65,21 +65,26 @@ Ingests, aggregates, and analyzes live IT consultant assignments, open market te
    - One-click export to CSV for sales and recruitment follow-up.
    - **AI Consulting Pitch Generator:** Generates tailored, ready-to-send Swedish sales pitch emails with customizable consultant seniority and availability.
 
-3. **Prediktiv Prognos & Kompetensradar (AI/ML):**
+3. **Konsultmatchning & Bänkoptimering (Bench Matching):**
+   - Ranks the region's 144 live opportunities against consultant bench profiles using weighted skill, geography, and security clearance matching.
+   - 5 pre-configured regional consultant profiles (.NET/Azure, Cloud/DevOps, Embedded/Automotive, Data Engineering, Cybersecurity/NIS2) + free-form custom CV paste.
+   - Displays match scores (%), highlights overlapping vs missing skills, and auto-generates custom outreach emails tailored to the specific consultant and client.
+
+4. **Prediktiv Prognos & Kompetensradar (AI/ML):**
    - 6-month forward market volume forecast with calibrated 80% confidence intervals (P10–P90) using Holt-Winters exponential smoothing and cyclical seasonality.
    - **Competency Momentum & Upskilling Matrix:** Identifies accelerating skills (e.g. Terraform, Kubernetes, Databricks) vs stable cash cows and declining tech to guide consultant training and certification budgets.
    - Interactive on-demand re-training and automated bi-weekly MLOps workflow.
 
-4. **Historiska Trender (2022–2026):**
+5. **Historiska Trender (2022–2026):**
    - Long-term volume trendline tracking demand dynamics across nearly 5 years (3,800+ records).
    - Multi-skill evolution over time showing shifting technology stacks.
    - **Kompetenstillväxt-Barometer (%):** Quantifies fastest-growing skills.
    - **Säsongsmönster (Jan–Dec):** Reveals annual regional hiring peaks (March and October) to optimize sales timing.
 
-5. **Strategiskt Beslutsunderlag:**
+6. **Strategiskt Beslutsunderlag:**
    - Actionable executive recommendations for resource planning, certifications, and security clearance vetting in the Linköping defense corridor and Södertälje automotive sector.
 
-6. **Ledningsrapport & Veckobrev:**
+7. **Ledningsrapport & Veckobrev:**
    - Formatted executive intelligence brief.
    - One-click export to Markdown (`.md`) or standalone styled HTML email (`.html`).
    - Webhook integration for automated Slack / Microsoft Teams delivery.

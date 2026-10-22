@@ -33,6 +33,11 @@ from analytics.forecast_engine import (
     get_forecast_display_data,
     run_forecast_and_save,
 )
+from analytics.bench_matcher import (
+    PRESET_BENCH_PROFILES,
+    match_consultant_to_leads,
+)
+from ingestion.normalizer import extract_skills_from_text
 from ingestion.pipeline import run_pipeline
 
 # ----------------- PAGE CONFIGURATION -----------------
@@ -209,6 +214,43 @@ st.markdown(
         text-decoration: underline;
     }
 
+    /* Bench Matcher Tags */
+    .skill-matched {
+        display: inline-block;
+        background: rgba(16, 185, 129, 0.12);
+        color: #059669;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 2px 7px;
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    .skill-missing {
+        display: inline-block;
+        background: rgba(128, 128, 128, 0.08);
+        color: inherit;
+        opacity: 0.7;
+        border: 1px dashed rgba(128, 128, 128, 0.25);
+        border-radius: 4px;
+        font-size: 0.75rem;
+        padding: 2px 7px;
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    .skill-bonus {
+        display: inline-block;
+        background: rgba(37, 99, 235, 0.1);
+        color: #2563eb;
+        border: 1px solid rgba(37, 99, 235, 0.25);
+        border-radius: 4px;
+        font-size: 0.75rem;
+        padding: 2px 7px;
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+
     /* Strategic Notes */
     .strategy-card {
         background: rgba(128, 128, 128, 0.04);
@@ -263,6 +305,7 @@ db = SessionLocal()
 FUNCTION_VIEWS = [
     "Marknadsöversikt & Aktuella Behov",
     "Uppdrag & Lead Pipeline",
+    "Konsultmatchning & Bänkoptimering",
     "Prediktiv Prognos & Kompetensradar",
     "Historiska Trender (2022–2026)",
     "Strategiskt Beslutsunderlag",
@@ -617,6 +660,181 @@ elif current_view == "Uppdrag & Lead Pipeline":
             pitch = generate_sales_pitch(lead, consultant_profile=c_role, available_from=c_avail)
             st.text_input("Föreslagen ämnesrad", value=pitch["subject"], key=f"subj_{lead['id']}")
             st.text_area("Färdigt säljmejl (redigerbart)", value=pitch["body"], height=190, key=f"body_{lead['id']}")
+
+# ----------------- VIEW: KONSULTMATCHNING & BÄNKOPTIMERING -----------------
+elif current_view == "Konsultmatchning & Bänkoptimering":
+    st.markdown("##### Konsultmatchning & Bänkoptimering")
+    st.caption("Matcha tillgängliga konsulter mot regionens 144 aktiva IT- och teknikkrav. Systemet analyserar kompetensöverlapp, geografi och förbereder skräddarsydda säljmejl.")
+
+    # 1. Profile Selection Section
+    profile_options = [f"{p['name']} – {p['title']} ({p['location']})" for p in PRESET_BENCH_PROFILES]
+    profile_options.append("➕ Skapa egen konsultprofil / Klistra in CV")
+
+    col_sel1, col_sel2 = st.columns([3, 1])
+    with col_sel1:
+        chosen_profile_label = st.selectbox(
+            "Välj konsultprofil på bänken",
+            profile_options,
+            index=0,
+        )
+    with col_sel2:
+        min_score = st.slider("Lägsta matchningsgrad (%)", min_value=20, max_value=80, value=30, step=5)
+
+    is_custom = "Skapa egen" in chosen_profile_label
+
+    if not is_custom:
+        selected_prof_idx = profile_options.index(chosen_profile_label)
+        active_consultant = PRESET_BENCH_PROFILES[selected_prof_idx]
+
+        # Consultant summary card
+        skills_pills = "".join([f'<span class="skill-tag">{s}</span>' for s in active_consultant["skills"]])
+        clearance_text = " • Säkerhetsprövad (RK3/SUA)" if active_consultant.get("clearance") else ""
+        
+        st.markdown(
+            f"""
+            <div style="background: rgba(128, 128, 128, 0.04); border: 1px solid rgba(128, 128, 128, 0.18); border-radius: 8px; padding: 18px 20px; margin-bottom: 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                    <div>
+                        <div style="font-size: 1.15rem; font-weight: 700; color: inherit;">{active_consultant['name']}</div>
+                        <div style="font-size: 0.86rem; opacity: 0.8; margin-top: 2px;">{active_consultant['title']} • {active_consultant['seniority']} • {active_consultant['location']}{clearance_text}</div>
+                    </div>
+                    <div class="priority-pill p-growth">{active_consultant['available_from']}</div>
+                </div>
+                <div style="font-size: 0.85rem; opacity: 0.85; line-height: 1.5; margin-bottom: 12px;">{active_consultant['summary']}</div>
+                <div>{skills_pills}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown("###### Egen konsultprofil")
+        col_c1, col_c2, col_c3 = st.columns([2, 2, 1])
+        with col_c1:
+            c_name_input = st.text_input("Konsultens namn", value="Anna Andersson")
+            c_role_input = st.text_input("Rollextitel", value="Senior Fullstack-utvecklare")
+        with col_c2:
+            c_loc_input = st.selectbox("Ort / Primärt område", ["Linköping", "Norrköping", "Södertälje", "Nyköping", "Hela regionen"])
+            c_avail_input = st.text_input("Tillgänglig från", value="Omgående")
+        with col_c3:
+            c_clear_input = st.checkbox("Säkerhetsprövad", value=False)
+            c_seniority_input = st.selectbox("Erfarenhet", ["Junior (1–3 år)", "Mid (3–5 år)", "Senior (5–10 år)", "Lead (>10 år)"], index=2)
+
+        raw_cv_text = st.text_area(
+            "Klistra in konsultens profil, CV-sammanfattning eller tekniska nyckelord",
+            height=110,
+            placeholder="T.ex: Erfaren utvecklare med stark bakgrund inom C#, .NET 8, React, Azure, Docker, Kubernetes och REST API...",
+        )
+
+        detected_custom_skills = [s[0] for s in extract_skills_from_text(raw_cv_text)] if raw_cv_text else []
+        all_skills = [s.name for s in db.query(Skill).order_by(Skill.name).all()]
+        
+        custom_selected_skills = st.multiselect(
+            "Kompetenser (extraherade automatiskt ur texten, lägg till eller justera vid behov)",
+            all_skills,
+            default=[s for s in detected_custom_skills if s in all_skills],
+        )
+
+        active_consultant = {
+            "name": c_name_input,
+            "title": c_role_input,
+            "seniority": c_seniority_input,
+            "location": c_loc_input,
+            "available_from": c_avail_input,
+            "clearance": c_clear_input,
+            "skills": custom_selected_skills,
+            "summary": raw_cv_text[:300] if raw_cv_text else f"{c_role_input} baserad i {c_loc_input}.",
+        }
+
+    # 2. Run Matcher against active market leads
+    matched_leads = match_consultant_to_leads(
+        db,
+        consultant=active_consultant,
+        location_filter=selected_location if selected_location != "Alla" else None,
+        min_match_pct=min_score,
+        limit=25,
+    )
+
+    # 3. Match Statistics Metrics
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    with col_m1:
+        st.metric("Matchade Uppdrag", f"{len(matched_leads)} st")
+    with col_m2:
+        top_match_score = f"{matched_leads[0]['match_score']}%" if matched_leads else "0%"
+        st.metric("Bästa Matchning", top_match_score)
+    with col_m3:
+        direct_consultant_count = sum(1 for m in matched_leads if m["is_consultant"])
+        st.metric("Direkta Konsultuppdrag", f"{direct_consultant_count} st")
+    with col_m4:
+        strong_matches_count = sum(1 for m in matched_leads if m["match_score"] >= 75)
+        st.metric("Hög Prioritet (>=75%)", f"{strong_matches_count} st")
+
+    st.markdown("---")
+
+    # 4. Render Matched Leads Cards
+    if matched_leads:
+        st.markdown(f"###### Relevanta affärsmöjligheter för {active_consultant['name']} (Sorterat efter matchningsgrad)")
+
+        for lead in matched_leads:
+            score = lead["match_score"]
+            if score >= 75:
+                score_pill = f'<span class="priority-pill p-growth">{score}% Match</span>'
+            elif score >= 55:
+                score_pill = f'<span class="priority-pill p-strategic">{score}% Match</span>'
+            else:
+                score_pill = f'<span class="priority-pill p-stable">{score}% Match</span>'
+
+            source_tag = (
+                '<span class="tag-source source-consultant">Konsultuppdrag</span>'
+                if lead["is_consultant"]
+                else '<span class="tag-source source-recruitment">Rekryteringsannons</span>'
+            )
+
+            matched_tags = "".join([f'<span class="skill-matched">✓ {s}</span>' for s in lead["matched_skills"]])
+            missing_tags = "".join([f'<span class="skill-missing">{s}</span>' for s in lead["missing_skills"][:4]])
+            bonus_tags = "".join([f'<span class="skill-bonus">+ {s}</span>' for s in lead["bonus_skills"]])
+
+            link_html = (
+                f'<a href="{lead["url"]}" target="_blank" class="link-action">Visa fullständig annons →</a>'
+                if lead["url"]
+                else '<span style="opacity:0.6; font-size:0.8rem;">Länk saknas</span>'
+            )
+
+            st.markdown(
+                f"""
+                <div class="lead-row">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                        <div>
+                            {score_pill} {source_tag}
+                            <div class="lead-title-text" style="margin-top: 6px;">{lead['title']}</div>
+                        </div>
+                        <div>
+                            {link_html}
+                        </div>
+                    </div>
+                    <div class="lead-attributes">
+                        <span>Beställare: <span class="lead-attr-strong">{lead['company']}</span></span>
+                        <span>Ort: <span class="lead-attr-strong">{lead['location']}</span></span>
+                        <span>Publicerad: <span>{lead['published_at']}</span></span>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 0.8rem;">
+                        <div style="margin-bottom: 4px;"><strong>Matchade krav:</strong> {matched_tags if matched_tags else '<span style=\"opacity:0.6;\">Inga direkta teknikkrav</span>'}</div>
+                        {f'<div style=\"margin-bottom: 4px;\"><strong style=\"opacity:0.7;\">Övriga krav i annons:</strong> {missing_tags}</div>' if missing_tags else ''}
+                        {f'<div><strong style=\"color:#2563eb;\">Konsultens mervärde:</strong> {bonus_tags}</div>' if bonus_tags else ''}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            with st.expander(f"Generera säljpitch för {active_consultant['name']} till {lead['company']}"):
+                col_sp1, col_sp2 = st.columns([3, 1])
+                with col_sp1:
+                    st.text_input("Föreslagen ämnesrad", value=lead["pitch_subject"], key=f"pitch_sub_{lead['lead_id']}_{active_consultant['name']}")
+                with col_sp2:
+                    st.caption("Färdigt att kopiera & skicka")
+                st.text_area("Säljmejl (redigerbart)", value=lead["pitch_body"], height=190, key=f"pitch_body_{lead['lead_id']}_{active_consultant['name']}")
+    else:
+        st.info("Inga uppdrag nådde den valda lägsta matchningsgraden. Prova att sänka matchningströskeln ovan.")
 
 # ----------------- VIEW 3: PREDIKTIV PROGNOS & KOMPETENSRADAR -----------------
 elif current_view == "Prediktiv Prognos & Kompetensradar":
