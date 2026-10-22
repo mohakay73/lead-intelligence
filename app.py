@@ -1,9 +1,12 @@
 import os
+from pathlib import Path
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+
+BASE_DIR = Path(__file__).resolve().parent
 from database.connection import init_db, SessionLocal
 from database.models import Skill, Lead
 import importlib
@@ -1219,37 +1222,75 @@ elif current_view == "Ledningsrapport & Veckobrev":
             mime="text/html",
             use_container_width=True,
         )
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+    current_env_webhook = os.getenv("TEAMS_WEBHOOK_URL", "").strip()
+
     with col_btn_teams:
         if st.button("Skicka rapport till Microsoft Teams nu", use_container_width=True):
-            if send_teams_notification(digest_md):
+            target_url = st.session_state.get("custom_teams_url") or current_env_webhook
+            if target_url and send_teams_notification(digest_md, webhook_url=target_url):
                 st.success("Veckorapporten har skickats till din Microsoft Teams-kanal!")
             else:
                 st.warning("Kunde inte skicka. Kontrollera att din TEAMS_WEBHOOK_URL är konfigurerad nedan.")
 
     # Expandable Microsoft Teams Webhook Configuration box
-    with st.expander("Koppla & Konfigurera Microsoft Teams Webhook"):
+    with st.expander("Koppla & Konfigurera Microsoft Teams Webhook", expanded=not bool(current_env_webhook)):
+        if current_env_webhook:
+            st.success("Microsoft Teams Webhook är kopplad i `.env`.")
+        else:
+            st.info("Koppla ihop valfri kanal i Microsoft Teams för automatiserade rapporter varje måndag.")
+
         st.markdown(
             """
-            Koppla ihop valfri kanal i Microsoft Teams för automatiserade rapporter varje måndag:
             1. **I Teams:** Gå till den kanal där du vill få rapporterna -> Klicka på `...` -> Välj **Arbetsflöden (Workflows)**.
-            2. Välj mallen *"Publicera i en kanal när en webhook-begäran tas emot"* (Post to a channel when a webhook request is received).
+            2. Sök efter mallen **"webhook"** och välj *"Send webhook alerts to a channel"* (eller *"Skicka webhook-aviseringar till en kanal"*).
             3. Kopiera den genererade webhook-länken och klistra in den nedan.
             """
         )
-        current_env_webhook = os.getenv("TEAMS_WEBHOOK_URL", "")
         custom_teams_url = st.text_input(
             "Teams Webhook URL",
-            value=current_env_webhook,
-            placeholder="https://prod-xx.westeurope.logic.azure.com:443/workflows/... eller https://outlook.office.com/webhook/...",
+            value=st.session_state.get("custom_teams_url", current_env_webhook),
+            key="custom_teams_url_input",
+            placeholder="https://...powerplatform.com:443/powerautomate/automations/... eller logic.azure.com",
         )
-        if st.button("Skicka testmeddelande till denna Teams-länk"):
-            if custom_teams_url.strip():
-                if send_teams_notification(digest_md, webhook_url=custom_teams_url.strip()):
-                    st.success("Testrapporten levererades till Microsoft Teams! Kontrollera din kanal nu.")
+        if custom_teams_url:
+            st.session_state["custom_teams_url"] = custom_teams_url.strip()
+
+        col_t1, col_t2 = st.columns([1, 1])
+        with col_t1:
+            if st.button("Skicka testmeddelande till denna Teams-länk"):
+                active_url = custom_teams_url.strip() or current_env_webhook
+                if active_url:
+                    if send_teams_notification(digest_md, webhook_url=active_url):
+                        st.success("Testrapporten levererades till Microsoft Teams! Kontrollera din kanal nu.")
+                    else:
+                        st.error("Kunde inte skicka. Kontrollera att länken är komplett kopierad från Teams.")
                 else:
-                    st.error("Kunde inte skicka. Kontrollera att länken är komplett kopierad från Teams.")
-            else:
-                st.warning("Klistra in en Teams Webhook URL i rutan först.")
+                    st.warning("Klistra in en Teams Webhook URL i rutan först.")
+        with col_t2:
+            if st.button("Spara till .env-filen"):
+                if custom_teams_url.strip():
+                    try:
+                        env_path = BASE_DIR / ".env"
+                        env_content = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
+                        if "TEAMS_WEBHOOK_URL=" in env_content:
+                            lines = env_content.splitlines()
+                            new_lines = []
+                            for l in lines:
+                                if l.strip().startswith("TEAMS_WEBHOOK_URL="):
+                                    new_lines.append(f"TEAMS_WEBHOOK_URL={custom_teams_url.strip()}")
+                                else:
+                                    new_lines.append(l)
+                            env_path.write_text("\n".join(new_lines), encoding="utf-8")
+                        else:
+                            env_path.write_text(env_content + f"\nTEAMS_WEBHOOK_URL={custom_teams_url.strip()}\n", encoding="utf-8")
+                        load_dotenv(override=True)
+                        st.success("Webhook-länken sparades permanent i .env!")
+                    except Exception as ex:
+                        st.error(f"Kunde inte spara till .env: {ex}")
+                else:
+                    st.warning("Ange en länk att spara.")
 
     st.markdown("##### Förhandsgranskning av veckorapporten")
     st.markdown(digest_md)

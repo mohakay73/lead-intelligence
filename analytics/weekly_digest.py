@@ -221,14 +221,17 @@ def send_teams_notification(markdown_content: str, webhook_url: Optional[str] = 
     Dispatches report to Microsoft Teams webhook.
     Supports both Modern Teams Workflows (Power Automate) and Classic Office 365 Connector webhooks.
     """
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+
     url = webhook_url or os.getenv("TEAMS_WEBHOOK_URL") or os.getenv("SLACK_WEBHOOK_URL")
     if not url:
         return False
 
     headers = {"Content-Type": "application/json"}
 
-    # 1. Modern Teams Workflows (Logic Apps / Power Automate) payload
-    if "logic.azure.com" in url or "powerautomate" in url:
+    # 1. Modern Teams Workflows (Logic Apps / Power Automate / Power Platform) payload
+    if "logic.azure.com" in url or "powerautomate" in url or "powerplatform" in url:
         payload = {
             "type": "message",
             "attachments": [
