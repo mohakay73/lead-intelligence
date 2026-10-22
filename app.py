@@ -5,8 +5,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env", override=True)
+
 from database.connection import init_db, SessionLocal
 from database.models import Skill, Lead
 import importlib
@@ -47,12 +50,12 @@ from ingestion.pipeline import run_pipeline
 
 # ----------------- PAGE CONFIGURATION -----------------
 st.set_page_config(
-    page_title="Lead Intelligence Platform | Östergötland",
+    page_title="Lead Intelligence Platform | Östergötland & E4 Syd",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ----------------- THEME-AWARE EXECUTIVE CSS (DARK & LIGHT) -----------------
+# ----------------- THEME-AWARE EXECUTIVE CSS -----------------
 st.markdown(
     """
     <style>
@@ -64,17 +67,17 @@ st.markdown(
 
     /* Minimalist Header Container */
     .header-container {
-        border-bottom: 1px solid rgba(128, 128, 128, 0.2);
-        padding-bottom: 18px;
-        margin-bottom: 22px;
+        border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+        padding-bottom: 16px;
+        margin-bottom: 16px;
         display: flex;
         justify-content: space-between;
         align-items: flex-end;
         flex-wrap: wrap;
-        gap: 16px;
+        gap: 12px;
     }
     .header-title {
-        font-size: 1.6rem;
+        font-size: 1.55rem;
         font-weight: 700;
         color: inherit;
         letter-spacing: -0.02em;
@@ -82,7 +85,7 @@ st.markdown(
         line-height: 1.2;
     }
     .header-subtitle {
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         opacity: 0.72;
         color: inherit;
         margin-top: 4px;
@@ -107,30 +110,30 @@ st.markdown(
         background-color: #0d9488;
     }
 
-    /* Metric Boxes (Adaptive Backgrounds) */
+    /* Metric Boxes */
     .metrics-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 16px;
-        margin-bottom: 26px;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 14px;
+        margin-bottom: 22px;
     }
     .metric-box {
-        background: rgba(128, 128, 128, 0.05);
-        border: 1px solid rgba(128, 128, 128, 0.18);
+        background: rgba(128, 128, 128, 0.04);
+        border: 1px solid rgba(128, 128, 128, 0.16);
         border-radius: 8px;
-        padding: 18px 20px;
+        padding: 16px 18px;
     }
     .metric-caption {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         opacity: 0.7;
         color: inherit;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
     .metric-number {
-        font-size: 1.9rem;
+        font-size: 1.85rem;
         font-weight: 700;
         color: inherit;
         line-height: 1.1;
@@ -140,7 +143,7 @@ st.markdown(
         font-size: 0.78rem;
         opacity: 0.6;
         color: inherit;
-        margin-top: 6px;
+        margin-top: 5px;
     }
 
     /* Lead Item Card */
@@ -261,8 +264,8 @@ st.markdown(
         background: rgba(128, 128, 128, 0.04);
         border: 1px solid rgba(128, 128, 128, 0.18);
         border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 16px;
+        padding: 18px 20px;
+        margin-bottom: 14px;
     }
     .strategy-header {
         display: flex;
@@ -297,52 +300,98 @@ st.markdown(
         font-size: 0.84rem;
         color: inherit;
     }
+
+    /* Clean Sidebar Radio Navigation */
+    div[data-testid="stSidebar"] div[role="radiogroup"] {
+        gap: 4px;
+        display: flex;
+        flex-direction: column;
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label {
+        background: rgba(128, 128, 128, 0.04);
+        border: 1px solid rgba(128, 128, 128, 0.12);
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin: 0;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: rgba(37, 99, 235, 0.08);
+        border-color: rgba(37, 99, 235, 0.3);
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background: rgba(37, 99, 235, 0.14) !important;
+        border-color: #2563eb !important;
+        font-weight: 600;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
+# ----------------- PLOTLY STYLING HELPERS -----------------
+def style_chart(fig, height=380, show_legend=True):
+    fig.update_layout(
+        height=height,
+        font=dict(family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size=12),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=10, r=20, t=35, b=25),
+        showlegend=show_legend,
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="rgba(128,128,128,0.12)", zeroline=False)
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(128,128,128,0.12)", zeroline=False)
+    return fig
+
+def style_pie(fig, height=360):
+    fig.update_layout(
+        height=height,
+        font=dict(family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size=12),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=10, r=10, t=35, b=25),
+        showlegend=False,
+    )
+    return fig
+
 # ----------------- DATABASE INITIALIZATION -----------------
 init_db()
 db = SessionLocal()
 
-# ----------------- VIEW STATE & SYNC -----------------
+# ----------------- NAVIGATION & WORKSPACES -----------------
 FUNCTION_VIEWS = [
-    "Marknadsöversikt & Aktuella Behov",
+    "Marknadsöversikt & Efterfrågan",
     "Uppdrag & Lead Pipeline",
     "Konsultmatchning & Bänkoptimering",
-    "Prediktiv Prognos & Kompetensradar",
-    "Historiska Trender (2022–2026)",
-    "Strategiskt Beslutsunderlag",
+    "Marknadsprognos & Trender",
     "Ledningsrapport & Veckobrev",
 ]
 
-if "app_view" not in st.session_state:
+if "app_view" not in st.session_state or st.session_state.app_view not in FUNCTION_VIEWS:
     st.session_state.app_view = FUNCTION_VIEWS[0]
-
-def sync_view_from_sidebar():
-    st.session_state.app_view = st.session_state.sidebar_view_choice
 
 # ----------------- SIDEBAR -----------------
 st.sidebar.markdown(
     """
     <div style="padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid rgba(128,128,128,0.2);">
-        <div style="font-size: 1.05rem; font-weight: 700; color: inherit;">Lead Intelligence</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: inherit; letter-spacing: -0.01em;">Lead Intelligence</div>
         <div style="font-size: 0.78rem; opacity: 0.7; color: inherit;">Östergötland, Södertälje & Nyköping</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-st.sidebar.markdown("**Funktion & Arbetsvy**")
-st.sidebar.selectbox(
-    "Välj funktion (Rullgardinsmeny)",
+st.sidebar.markdown("**Arbetsvy**")
+current_index = FUNCTION_VIEWS.index(st.session_state.app_view) if st.session_state.app_view in FUNCTION_VIEWS else 0
+selected_view = st.sidebar.radio(
+    "Välj vy",
     FUNCTION_VIEWS,
-    index=FUNCTION_VIEWS.index(st.session_state.app_view),
-    key="sidebar_view_choice",
-    on_change=sync_view_from_sidebar,
+    index=current_index,
     label_visibility="collapsed",
 )
+st.session_state.app_view = selected_view
+current_view = selected_view
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Filter**")
@@ -378,138 +427,97 @@ if st.sidebar.button("Synkronisera data nu", use_container_width=True):
 
 st.sidebar.markdown(
     """
-    <div style="background: rgba(128, 128, 128, 0.06); border: 1px solid rgba(128, 128, 128, 0.16); border-radius: 6px; padding: 12px; margin-top: 16px; font-size: 0.75rem; opacity: 0.8; color: inherit; line-height: 1.5;">
+    <div style="background: rgba(128, 128, 128, 0.05); border: 1px solid rgba(128, 128, 128, 0.14); border-radius: 6px; padding: 12px; margin-top: 14px; font-size: 0.75rem; opacity: 0.8; color: inherit; line-height: 1.5;">
         <div style="font-weight: 600; margin-bottom: 4px;">Automatiserad drift (GitHub Actions)</div>
-        • Marknadssynkning: Vardagar kl. 07:00 CET<br>
-        • Veckorapport: Måndagar kl. 07:30 CET<br>
+        • Daglig synkning: Vardagar kl. 06:00 CET<br>
+        • Veckorapport (Teams): Måndagar kl. 07:00 CET<br>
         • ML-modellträning: 1:a & 15:e i månaden
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# ----------------- HEADER -----------------
-kpis = get_overview_kpis(db)
-
+# ----------------- GLOBAL HEADER -----------------
 st.markdown(
-    """
+    f"""
     <div class="header-container">
         <div>
             <div class="header-title">Marknadsintelligens & Beslutsstöd</div>
-            <div class="header-subtitle">IT- och teknikmarknaden i Östergötland, Södertälje & Nyköping</div>
+            <div class="header-subtitle">Regional IT- och teknikmarknad i Östergötland, Södertälje & Nyköping</div>
         </div>
-        <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
             <div class="status-badge">
                 <span class="status-indicator"></span>
                 <span>Databas ansluten • PostgreSQL</span>
             </div>
         </div>
     </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ----------------- METRIC CARDS -----------------
-st.markdown(
-    f"""
-    <div class="metrics-grid">
-        <div class="metric-box">
-            <div class="metric-caption">Totala aktiva behov</div>
-            <div class="metric-number">{kpis['total_leads']}</div>
-            <div class="metric-detail">Östergötland, Södertälje & Nyköping</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-caption">Konsultförfrågningar</div>
-            <div class="metric-number">{kpis['consultant_leads']}</div>
-            <div class="metric-detail">Brainville och mäklaruppdrag</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-caption">Rekryteringsannonser</div>
-            <div class="metric-number">{kpis['jobtech_leads']}</div>
-            <div class="metric-detail">Arbetsförmedlingen JobTech</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-caption">Aktiva organisationer</div>
-            <div class="metric-number">{kpis['unique_employers']}</div>
-            <div class="metric-detail">Unika uppdragsgivare & företag</div>
-        </div>
+    <div style="margin-top: -6px; margin-bottom: 22px; padding-bottom: 10px; border-bottom: 1px solid rgba(128, 128, 128, 0.14);">
+        <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; opacity: 0.6; letter-spacing: 0.05em;">Aktiv vy:</span>
+        <span style="font-size: 1.22rem; font-weight: 700; color: inherit; letter-spacing: -0.01em; margin-left: 6px;">{current_view}</span>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# ----------------- CURRENT VIEW HEADER -----------------
-current_view = st.session_state.app_view
+# ----------------- VIEW 1: MARKNADSÖVERSIKT & EFTERFRÅGAN -----------------
+if current_view == "Marknadsöversikt & Efterfrågan":
+    kpis = get_overview_kpis(db)
 
-st.markdown(
-    f"""
-    <div style="margin-top: 10px; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid rgba(128, 128, 128, 0.18);">
-        <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; opacity: 0.6; letter-spacing: 0.05em; margin-bottom: 2px;">Aktiv funktion</div>
-        <div style="font-size: 1.35rem; font-weight: 700; color: inherit; letter-spacing: -0.01em;">{current_view}</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+    # Macro KPI Grid
+    st.markdown(
+        f"""
+        <div class="metrics-grid">
+            <div class="metric-box">
+                <div class="metric-caption">Totala aktiva behov</div>
+                <div class="metric-number">{kpis['total_leads']}</div>
+                <div class="metric-detail">Östergötland, Södertälje & Nyköping</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-caption">Konsultförfrågningar</div>
+                <div class="metric-number">{kpis['consultant_leads']}</div>
+                <div class="metric-detail">Brainville och mäklaruppdrag</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-caption">Rekryteringsannonser</div>
+                <div class="metric-number">{kpis['jobtech_leads']}</div>
+                <div class="metric-detail">Arbetsförmedlingen JobTech</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-caption">Aktiva organisationer</div>
+                <div class="metric-number">{kpis['unique_employers']}</div>
+                <div class="metric-detail">Unika uppdragsgivare & företag</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-# ----------------- VIEW 1: MARKNADSÖVERSIKT -----------------
-if current_view == "Marknadsöversikt & Aktuella Behov":
-    st.markdown("##### Efterfrågan per kompetens och geografi")
-    
-    col_chart, col_geo = st.columns([3, 2])
-    
-    with col_chart:
+    # Row 1: Competencies (left) & Top Employers (right) - Balanced Bar Charts
+    col_skills, col_emp = st.columns(2)
+    with col_skills:
         skill_df = get_skill_demand(db, location=selected_location, source=selected_source, top_n=12)
         if not skill_df.empty:
-            fig = px.bar(
+            loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
+            fig_skills = px.bar(
                 skill_df,
                 x="count",
                 y="skill",
                 orientation="h",
                 color="category",
-                title=f"Mest efterfrågade tekniska kompetenser ({selected_location})",
-                labels={"count": "Antal förfrågningar", "skill": "Kompetens", "category": "Kategori"},
-                color_discrete_sequence=["#3b82f6", "#10b981", "#6366f1", "#06b6d4", "#f59e0b", "#ec4899"],
+                title=f"Mest efterfrågade kompetenser ({loc_label})",
+                labels={"count": "Behov", "skill": "Kompetens", "category": "Kategori"},
+                color_discrete_sequence=["#2563eb", "#10b981", "#6366f1", "#f59e0b", "#06b6d4", "#ec4899"],
             )
-            fig.update_layout(
-                yaxis={"categoryorder": "total ascending"},
-                height=480,
-                font={"family": "Inter, sans-serif"},
-                margin=dict(l=10, r=20, t=50, b=50),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
-            )
-            st.plotly_chart(fig, use_container_width=True, theme="streamlit")
+            fig_skills.update_layout(yaxis={"categoryorder": "total ascending"})
+            style_chart(fig_skills, height=400, show_legend=True)
+            fig_skills.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0))
+            st.plotly_chart(fig_skills, use_container_width=True)
         else:
             st.info("Ingen kompetensdata tillgänglig för det valda filtret.")
 
-    with col_geo:
-        loc_df = get_location_distribution(db, source=selected_source)
-        if not loc_df.empty:
-            fig_loc = px.pie(
-                loc_df,
-                values="count",
-                names="location",
-                title="Geografisk fördelning (Östergötland, Södertälje & Nyköping)",
-                hole=0.55,
-                color_discrete_sequence=["#2563eb", "#3b82f6", "#10b981", "#06b6d4", "#f59e0b", "#8b5cf6", "#ec4899", "#cbd5e1"],
-            )
-            fig_loc.update_traces(textposition="inside", textinfo="percent+label")
-            fig_loc.update_layout(
-                height=460,
-                font={"family": "Inter, sans-serif"},
-                margin=dict(l=10, r=10, t=40, b=20),
-                showlegend=False,
-            )
-            st.plotly_chart(fig_loc, use_container_width=True, theme="streamlit")
-        else:
-            st.info("Ingen ortsdata tillgänglig.")
-
-    st.markdown("---")
-    
-    col_emp, col_cat = st.columns([3, 2])
-    
     with col_emp:
-        st.markdown("##### Mest aktiva uppdragsgivare")
-        top_emp_df = get_top_employers(db, location=selected_location, source=selected_source, limit=15)
+        top_emp_df = get_top_employers(db, location=selected_location, source=selected_source, limit=12)
         if not top_emp_df.empty:
             loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
             fig_emp = px.bar(
@@ -518,43 +526,60 @@ if current_view == "Marknadsöversikt & Aktuella Behov":
                 y="company",
                 orientation="h",
                 color="location",
-                title=f"Organisationer med flest öppna förfrågningar ({loc_label})",
-                labels={"company": "Organisation", "count": "Antal behov", "location": "Ort"},
+                title=f"Mest aktiva uppdragsgivare ({loc_label})",
+                labels={"company": "Organisation", "count": "Behov", "location": "Ort"},
                 color_discrete_sequence=["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"],
             )
-            fig_emp.update_layout(
-                yaxis={"categoryorder": "total ascending"},
-                height=420,
-                font={"family": "Inter, sans-serif"},
-                margin=dict(l=10, r=20, t=40, b=20),
-            )
-            st.plotly_chart(fig_emp, use_container_width=True, theme="streamlit")
+            fig_emp.update_layout(yaxis={"categoryorder": "total ascending"})
+            style_chart(fig_emp, height=400, show_legend=True)
+            fig_emp.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0))
+            st.plotly_chart(fig_emp, use_container_width=True)
         else:
             st.info("Inga arbetsgivare matchar det valda filtret.")
-            
+
+    st.markdown("---")
+
+    # Row 2: Geography (left) & Technical Verticals (right) - Balanced Donut Charts
+    col_geo, col_cat = st.columns(2)
+    with col_geo:
+        loc_df = get_location_distribution(db, source=selected_source)
+        if not loc_df.empty:
+            fig_loc = px.pie(
+                loc_df,
+                values="count",
+                names="location",
+                title="Geografisk fördelning av uppdrag",
+                hole=0.55,
+                color_discrete_sequence=["#2563eb", "#3b82f6", "#10b981", "#06b6d4", "#f59e0b", "#8b5cf6", "#ec4899", "#cbd5e1"],
+            )
+            fig_loc.update_traces(textposition="inside", textinfo="percent+label")
+            style_pie(fig_loc, height=360)
+            st.plotly_chart(fig_loc, use_container_width=True)
+        else:
+            st.info("Ingen ortsdata tillgänglig.")
+
     with col_cat:
-        st.markdown("##### Fördelning per teknikområde")
         cat_df = get_category_distribution(db, location=selected_location, source=selected_source)
         if not cat_df.empty:
             fig_cat = px.pie(
                 cat_df,
                 values="count",
                 names="category",
-                title="Tekniska vertikaler",
+                title="Fördelning per tekniskt område",
                 hole=0.55,
                 color_discrete_sequence=["#2563eb", "#059669", "#7c3aed", "#d97706", "#db2777"],
             )
-            fig_cat.update_layout(
-                height=380,
-                font={"family": "Inter, sans-serif"},
-                margin=dict(l=10, r=10, t=40, b=20),
-            )
-            st.plotly_chart(fig_cat, use_container_width=True, theme="streamlit")
+            fig_cat.update_traces(textposition="inside", textinfo="percent+label")
+            style_pie(fig_cat, height=360)
+            st.plotly_chart(fig_cat, use_container_width=True)
+        else:
+            st.info("Ingen kategoridata tillgänglig.")
 
-# ----------------- VIEW 2: LEAD PIPELINE -----------------
+# ----------------- VIEW 2: UPPDRAG & LEAD PIPELINE -----------------
 elif current_view == "Uppdrag & Lead Pipeline":
     st.markdown("##### Marknadsförfrågningar och uppdragsflöde")
-    
+    st.caption("Sök och filtrera bland regionens aktiva uppdrag. Generera skräddarsydda konsultpitchar med ett klick.")
+
     col_search, col_skill_filter, col_limit = st.columns([3, 2, 1])
     with col_search:
         search_query = st.text_input("Sök i uppdragsbeskrivningar", "", placeholder="Sök roll, teknik eller bolagsnamn...")
@@ -644,12 +669,11 @@ elif current_view == "Uppdrag & Lead Pipeline":
             st.text_input("Föreslagen ämnesrad", value=pitch["subject"], key=f"subj_{lead['id']}")
             st.text_area("Färdigt säljmejl (redigerbart)", value=pitch["body"], height=190, key=f"body_{lead['id']}")
 
-# ----------------- VIEW: KONSULTMATCHNING & BÄNKOPTIMERING -----------------
+# ----------------- VIEW 3: KONSULTMATCHNING & BÄNKOPTIMERING -----------------
 elif current_view == "Konsultmatchning & Bänkoptimering":
     st.markdown("##### Konsultmatchning & Bänkoptimering")
-    st.caption("Matcha tillgängliga konsulter mot regionens 144 aktiva IT- och teknikkrav. Systemet analyserar kompetensöverlapp, geografi och förbereder skräddarsydda säljmejl.")
+    st.caption("Matcha tillgängliga konsulter mot regionens aktiva IT-krav med viktad poängberäkning och automatiska säljpitchar.")
 
-    # 1. Profile Selection Section
     profile_options = [f"{p['name']} – {p['title']} ({p['location']})" for p in PRESET_BENCH_PROFILES]
     profile_options.append("➕ Skapa egen konsultprofil / Klistra in CV")
 
@@ -669,7 +693,6 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
         selected_prof_idx = profile_options.index(chosen_profile_label)
         active_consultant = PRESET_BENCH_PROFILES[selected_prof_idx]
 
-        # Consultant summary card
         skills_pills = "".join([f'<span class="skill-tag">{s}</span>' for s in active_consultant["skills"]])
         clearance_text = " • Säkerhetsprövad (RK3/SUA)" if active_consultant.get("clearance") else ""
         
@@ -712,7 +735,7 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
         all_skills = [s.name for s in db.query(Skill).order_by(Skill.name).all()]
         
         custom_selected_skills = st.multiselect(
-            "Kompetenser (extraherade automatiskt ur texten, lägg till eller justera vid behov)",
+            "Kompetenser (extraherade automatiskt ur texten, justera vid behov)",
             all_skills,
             default=[s for s in detected_custom_skills if s in all_skills],
         )
@@ -728,7 +751,6 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
             "summary": raw_cv_text[:300] if raw_cv_text else f"{c_role_input} baserad i {c_loc_input}.",
         }
 
-    # 2. Run Matcher against active market leads
     matched_leads = match_consultant_to_leads(
         db,
         consultant=active_consultant,
@@ -737,7 +759,6 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
         limit=25,
     )
 
-    # 3. Match Statistics Metrics
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.metric("Matchade Uppdrag", f"{len(matched_leads)} st")
@@ -753,7 +774,6 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
 
     st.markdown("---")
 
-    # 4. Render Matched Leads Cards
     if matched_leads:
         st.markdown(f"###### Relevanta affärsmöjligheter för {active_consultant['name']} (Sorterat efter matchningsgrad)")
 
@@ -819,352 +839,332 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
     else:
         st.info("Inga uppdrag nådde den valda lägsta matchningsgraden. Prova att sänka matchningströskeln ovan.")
 
-# ----------------- VIEW 3: PREDIKTIV PROGNOS & KOMPETENSRADAR -----------------
-elif current_view == "Prediktiv Prognos & Kompetensradar":
-    st.markdown("##### Prediktiv Marknadsprognos & Kompetensradar (6 Månader Framåt)")
-    st.caption("AI/ML-tidsserieprognos med Holt-Winters säsongsmodell & momentum-analys tränad på 58 månaders data (2022–2026) sparad i Supabase.")
+# ----------------- VIEW 4: MARKNADSPROGNOS & TRENDER (UNIFIED SUITE) -----------------
+elif current_view == "Marknadsprognos & Trender":
+    tab_forecast, tab_history, tab_strategy = st.tabs([
+        "6-Månaders AI-Prognos",
+        "Historik & Säsongsmönster (2022–2026)",
+        "Strategiskt Beslutsunderlag",
+    ])
 
-    hist_df, fc_df, trending_skills = get_forecast_display_data(db, location=selected_location)
+    with tab_forecast:
+        st.markdown("##### Prediktiv Efterfrågeprognos (6 Månader Framåt)")
+        st.caption("Maskininlärningsprognos (Holt-Winters säsongsextrapolering & momentum) tränad på 58 månaders data (2022–2026) sparad i Supabase.")
 
-    if not fc_df.empty:
-        avg_fc_vol = fc_df["predicted_volume"].mean()
-        peak_month_row = fc_df.loc[fc_df["predicted_volume"].idxmax()]
-        top_growth_skill = trending_skills[0] if trending_skills else None
+        hist_df, fc_df, trending_skills = get_forecast_display_data(db, location=selected_location)
 
-        col_fc1, col_fc2, col_fc3 = st.columns(3)
-        with col_fc1:
-            st.metric(
-                "Prognosticerad Snittvolym (Kommande 6 mån)",
-                f"{avg_fc_vol:.0f} st/mån",
-                delta=f"{fc_df['growth_mom_pct'].iloc[0]:+.1f}% startmånad",
-            )
-        with col_fc2:
-            st.metric(
-                "Förväntad Efterfrågetopp",
-                f"{peak_month_row['predicted_volume']:.0f} st",
-                help=f"Toppmånad: {peak_month_row['period']}",
-            )
-        with col_fc3:
-            if top_growth_skill:
+        if not fc_df.empty:
+            avg_fc_vol = fc_df["predicted_volume"].mean()
+            peak_month_row = fc_df.loc[fc_df["predicted_volume"].idxmax()]
+            top_growth_skill = trending_skills[0] if trending_skills else None
+
+            col_fc1, col_fc2, col_fc3 = st.columns(3)
+            with col_fc1:
                 st.metric(
-                    "Starkast Kompetenstillväxt",
-                    f"{top_growth_skill['skill']}",
-                    delta=f"+{top_growth_skill['growth_pct']:.0f}% momentum",
+                    "Prognosticerad Snittvolym (Kommande 6 mån)",
+                    f"{avg_fc_vol:.0f} st/mån",
+                    delta=f"{fc_df['growth_mom_pct'].iloc[0]:+.1f}% startmånad",
                 )
-            else:
-                st.metric("Kompetenstillväxt", "Beräknad", delta="Normal")
-
-        st.markdown("---")
-
-        # Forecast Line Chart with Confidence Interval
-        st.markdown("###### Volymutveckling & 6-månaders framtidsprognos (med konfidensintervall)")
-        
-        hist_subset = hist_df.tail(18).copy()
-        
-        fig_fc = go.Figure()
-
-        # Add Historical Line
-        fig_fc.add_trace(go.Scatter(
-            x=hist_subset["period"],
-            y=hist_subset["total_postings"],
-            mode="lines+markers",
-            name="Historisk volym (Utfall)",
-            line=dict(color="#2563eb", width=2.5),
-            marker=dict(size=6),
-        ))
-
-        # Bridge point: connect last historical point to first forecast point
-        bridge_x = [hist_subset["period"].iloc[-1]] + list(fc_df["period"])
-        bridge_y = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["predicted_volume"])
-        bridge_lower = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["ci_lower"])
-        bridge_upper = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["ci_upper"])
-
-        # Confidence Interval (Upper bound)
-        fig_fc.add_trace(go.Scatter(
-            x=bridge_x,
-            y=bridge_upper,
-            mode="lines",
-            line=dict(width=0),
-            showlegend=False,
-            hoverinfo="skip",
-        ))
-
-        # Confidence Interval (Lower bound filled to upper)
-        fig_fc.add_trace(go.Scatter(
-            x=bridge_x,
-            y=bridge_lower,
-            mode="lines",
-            line=dict(width=0),
-            fill="tonexty",
-            fillcolor="rgba(37, 99, 235, 0.12)",
-            name="80% Konfidensintervall (P10–P90)",
-            hoverinfo="skip",
-        ))
-
-        # Forecast Line
-        fig_fc.add_trace(go.Scatter(
-            x=bridge_x,
-            y=bridge_y,
-            mode="lines+markers",
-            name="Maskininlärningsprognos",
-            line=dict(color="#10b981", width=3, dash="dash"),
-            marker=dict(size=7, symbol="diamond"),
-        ))
-
-        loc_label = selected_location if selected_location != "Alla" else "Hela regionen (Östergötland, Södertälje & Nyköping)"
-        fig_fc.update_layout(
-            title=f"Marknadsprognos & Efterfrågebana ({loc_label})",
-            xaxis_title="Period (Månad)",
-            yaxis_title="Antal IT-behov / Uppdrag",
-            height=420,
-            font={"family": "Inter, sans-serif"},
-            margin=dict(l=10, r=20, t=40, b=20),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
-            hovermode="x unified",
-        )
-        st.plotly_chart(fig_fc, use_container_width=True, theme="streamlit")
-
-        st.markdown("---")
-
-        # Competency Momentum & Upskilling Matrix
-        st.markdown("###### Framtida Kompetensbehov & Vidareutbildningsrekommendationer (Upskilling Matrix)")
-        st.caption("Sorterat efter efterfrågeacceleration och tillväxt mellan perioderna. Ger ledningen direkt underlag för vilka certifieringar konsulter ska prioriteras inom.")
-
-        if trending_skills:
-            col_u1, col_u2 = st.columns([3, 2])
-            with col_u1:
-                skills_table_df = pd.DataFrame(trending_skills)
-                display_table = skills_table_df[["skill", "category", "current_volume", "growth_pct", "action"]].copy()
-                display_table.columns = ["Kompetens", "Kategori", "Aktuella behov (6m)", "Tillväxt (%)", "Strategisk Rekommendation"]
-                st.dataframe(
-                    display_table,
-                    use_container_width=True,
-                    hide_index=True,
+            with col_fc2:
+                st.metric(
+                    "Förväntad Efterfrågetopp",
+                    f"{peak_month_row['predicted_volume']:.0f} st",
+                    help=f"Toppmånad: {peak_month_row['period']}",
                 )
+            with col_fc3:
+                if top_growth_skill:
+                    st.metric(
+                        "Starkast Kompetenstillväxt",
+                        f"{top_growth_skill['skill']}",
+                        delta=f"+{top_growth_skill['growth_pct']:.0f}% momentum",
+                    )
+                else:
+                    st.metric("Kompetenstillväxt", "Beräknad", delta="Normal")
 
-            with col_u2:
-                st.markdown(
-                    """
-                    <div style="background: rgba(128, 128, 128, 0.05); border: 1px solid rgba(128, 128, 128, 0.15); border-radius: 8px; padding: 16px; font-size: 0.88rem; line-height: 1.6;">
-                        <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 8px;">Ledningsåtgärder för konsultteamet:</div>
-                        <strong>1. Investera & Certifiera:</strong> Konsulter på bänken eller med ledig tid bör omedelbart styras mot certifieringar inom <em>Terraform, Kubernetes (CKA) och Databricks</em>.<br>
-                        <strong>2. Rekryteringsfokus:</strong> Styr kravprofiler för seniorrekrytering mot Cloud Architecture och NIS2-säkerhet där tillväxttakten är som högst.<br>
-                        <strong>3. Kassakor:</strong> Bibehåll senior leverans inom etablerad systemutveckling (.NET, C#, C++, Python) som står för den stabila basvolymen.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            st.markdown("---")
 
-        col_btn_retrain, col_btn_info = st.columns([1, 3])
-        with col_btn_retrain:
-            if st.button("Kör om ML-prognos nu", use_container_width=True):
-                with st.spinner("Tränar om tidsserie- och momentummodeller..."):
+            # Forecast Line Chart with Confidence Interval
+            hist_subset = hist_df.tail(18).copy()
+            fig_fc = go.Figure()
+
+            # Add Historical Line
+            fig_fc.add_trace(go.Scatter(
+                x=hist_subset["period"],
+                y=hist_subset["total_postings"],
+                mode="lines+markers",
+                name="Historisk volym (Utfall)",
+                line=dict(color="#2563eb", width=2.5),
+                marker=dict(size=6),
+            ))
+
+            # Bridge point
+            bridge_x = [hist_subset["period"].iloc[-1]] + list(fc_df["period"])
+            bridge_y = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["predicted_volume"])
+            bridge_lower = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["ci_lower"])
+            bridge_upper = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["ci_upper"])
+
+            fig_fc.add_trace(go.Scatter(
+                x=bridge_x,
+                y=bridge_upper,
+                mode="lines",
+                line=dict(width=0),
+                showlegend=False,
+                hoverinfo="skip",
+            ))
+
+            fig_fc.add_trace(go.Scatter(
+                x=bridge_x,
+                y=bridge_lower,
+                mode="lines",
+                line=dict(width=0),
+                fill="tonexty",
+                fillcolor="rgba(37, 99, 235, 0.12)",
+                name="80% Konfidensintervall (P10–P90)",
+                hoverinfo="skip",
+            ))
+
+            fig_fc.add_trace(go.Scatter(
+                x=bridge_x,
+                y=bridge_y,
+                mode="lines+markers",
+                name="Maskininlärningsprognos",
+                line=dict(color="#10b981", width=3, dash="dash"),
+                marker=dict(size=7, symbol="diamond"),
+            ))
+
+            loc_label = selected_location if selected_location != "Alla" else "Hela regionen (Östergötland, Södertälje & Nyköping)"
+            fig_fc.update_layout(
+                title=f"Marknadsprognos & Efterfrågebana ({loc_label})",
+                xaxis_title="Period (Månad)",
+                yaxis_title="Antal IT-behov / Uppdrag",
+                hovermode="x unified",
+            )
+            style_chart(fig_fc, height=400, show_legend=True)
+            fig_fc.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0))
+            st.plotly_chart(fig_fc, use_container_width=True)
+
+            st.markdown("---")
+
+            # Upskilling Matrix
+            st.markdown("###### Framtida Kompetensbehov & Vidareutbildningsrekommendationer (Upskilling Matrix)")
+            st.caption("Sorterat efter efterfrågeacceleration och tillväxt mellan perioderna.")
+
+            if trending_skills:
+                col_u1, col_u2 = st.columns([3, 2])
+                with col_u1:
+                    skills_table_df = pd.DataFrame(trending_skills)
+                    display_table = skills_table_df[["skill", "category", "current_volume", "growth_pct", "action"]].copy()
+                    display_table.columns = ["Kompetens", "Kategori", "Aktuella behov (6m)", "Tillväxt (%)", "Strategisk Rekommendation"]
+                    st.dataframe(
+                        display_table,
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+                with col_u2:
+                    st.markdown(
+                        """
+                        <div style="background: rgba(128, 128, 128, 0.04); border: 1px solid rgba(128, 128, 128, 0.16); border-radius: 8px; padding: 16px; font-size: 0.88rem; line-height: 1.6;">
+                            <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 8px;">Ledningsåtgärder för konsultteamet:</div>
+                            <strong>1. Investera & Certifiera:</strong> Konsulter på bänken bör prioriteras mot certifieringar inom <em>Terraform, Kubernetes (CKA) och Databricks</em>.<br>
+                            <strong>2. Rekryteringsfokus:</strong> Styr kravprofiler för seniorrekrytering mot Cloud Architecture och NIS2-säkerhet där tillväxttakten är som högst.<br>
+                            <strong>3. Kassakor:</strong> Bibehåll senior leverans inom etablerad systemutveckling (.NET, C#, C++, Python) som står för den stabila basvolymen.
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+            col_btn_retrain, col_btn_info = st.columns([1, 3])
+            with col_btn_retrain:
+                if st.button("Kör om ML-prognos nu", use_container_width=True):
+                    with st.spinner("Tränar om tidsserie- och momentummodeller..."):
+                        run_forecast_and_save(db, location=selected_location)
+                        st.success("Modell omtränad och prognos uppdaterad!")
+                        st.rerun()
+            with col_btn_info:
+                st.caption("Modellen tränas automatiskt varannan vecka via GitHub Actions. Klicka ovan för att framtvinga en omedelbar omräkning.")
+        else:
+            st.info("Ingen förberäknad prognos tillgänglig för det valda filtret. Klicka på knappen nedan för att generera den.")
+            if st.button("Generera prognos nu"):
+                with st.spinner("Tränar modell..."):
                     run_forecast_and_save(db, location=selected_location)
-                    st.success("Modell omtränad och prognos uppdaterad!")
                     st.rerun()
-        with col_btn_info:
-            st.caption("Modellen tränas automatiskt varannan vecka via GitHub Actions. Klicka ovan för att manuellt framtvinga en omedelbar omräkning.")
-    else:
-        st.info("Ingen förberäknad prognos tillgänglig för det valda filtret. Klicka på knappen nedan för att generera den.")
-        if st.button("Generera prognos nu"):
-            with st.spinner("Tränar modell..."):
-                run_forecast_and_save(db, location=selected_location)
-                st.rerun()
 
-# ----------------- VIEW 4: HISTORISKA TRENDER -----------------
-elif current_view == "Historiska Trender (2022–2026)":
-    st.markdown("##### Historisk marknadsutveckling (2022–2026)")
-    st.caption("Djupanalys baserad på över 3 800 historiska IT-annonser i Östergötland, Södertälje och Nyköping.")
+    with tab_history:
+        st.markdown("##### Historisk Marknadsutveckling (2022–2026)")
+        st.caption("Djupanalys baserad på över 3 800 historiska IT-annonser i Östergötland, Södertälje och Nyköping.")
 
-    # 1. Top row: Monthly volume trend + Seasonality
-    col_t1, col_t2 = st.columns([3, 2])
-    with col_t1:
-        vol_df = get_monthly_volume_trend(db, location=selected_location)
-        if not vol_df.empty:
-            loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
-            fig_vol = px.line(
-                vol_df,
-                x="month",
-                y="postings",
-                title=f"Volymtrend månad för månad ({loc_label})",
-                labels={"month": "Månad", "postings": "Antal annonserade IT-positioner"},
-                markers=True,
-                color_discrete_sequence=["#2563eb"],
-            )
-            fig_vol.update_layout(
-                height=380,
-                font={"family": "Inter, sans-serif"},
-                margin=dict(l=10, r=20, t=40, b=20),
-            )
-            st.plotly_chart(fig_vol, use_container_width=True, theme="streamlit")
-            st.caption("Månatlig volym från JobTech Historical API (2024–2026-09) samt dagsaktuellt realtidsflöde för pågående månad (2026-10).")
-        else:
-            st.info("Ingen historisk volymdata tillgänglig för valt filter.")
+        # Row 1: Monthly Trend (left) & Seasonality (right) - Balanced
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            vol_df = get_monthly_volume_trend(db, location=selected_location)
+            if not vol_df.empty:
+                loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
+                fig_vol = px.line(
+                    vol_df,
+                    x="month",
+                    y="postings",
+                    title=f"Volymtrend månad för månad ({loc_label})",
+                    labels={"month": "Månad", "postings": "Annonserade IT-positioner"},
+                    markers=True,
+                    color_discrete_sequence=["#2563eb"],
+                )
+                style_chart(fig_vol, height=380, show_legend=False)
+                st.plotly_chart(fig_vol, use_container_width=True)
+            else:
+                st.info("Ingen historisk volymdata tillgänglig för valt filter.")
 
-    with col_t2:
-        season_df = get_seasonal_pattern(db, location=selected_location)
-        if not season_df.empty:
-            fig_season = px.bar(
-                season_df,
-                x="month_name",
-                y="count",
-                title="Säsongsmönster: När rekryterar kunderna som mest?",
-                labels={"month_name": "Kalendermånad", "count": "Sammanlagd volym"},
-                color="count",
-                color_continuous_scale="Blues",
-            )
-            fig_season.update_layout(
-                height=380,
-                font={"family": "Inter, sans-serif"},
-                margin=dict(l=10, r=10, t=40, b=20),
-                coloraxis_showscale=False,
-            )
-            st.plotly_chart(fig_season, use_container_width=True, theme="streamlit")
+        with col_t2:
+            season_df = get_seasonal_pattern(db, location=selected_location)
+            if not season_df.empty:
+                fig_season = px.bar(
+                    season_df,
+                    x="month_name",
+                    y="count",
+                    title="Säsongsmönster: När rekryterar kunderna som mest?",
+                    labels={"month_name": "Kalendermånad", "count": "Sammanlagd volym"},
+                    color="count",
+                    color_continuous_scale="Blues",
+                )
+                style_chart(fig_season, height=380, show_legend=False)
+                fig_season.update_layout(coloraxis_showscale=False)
+                st.plotly_chart(fig_season, use_container_width=True)
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # 2. Second row: Skill evolution over time + Growth Barometer
-    col_t3, col_t4 = st.columns([3, 2])
-    with col_t3:
-        skills_ts_df = get_top_skills_time_series(db, location=selected_location, top_n=6)
-        if not skills_ts_df.empty:
-            fig_ts = px.line(
-                skills_ts_df,
-                x="month",
-                y="count",
-                color="skill",
-                title="Kompetensutveckling över tid: Topp 6 teknologier",
-                labels={"month": "Månad", "count": "Efterfrågan (annonser)", "skill": "Kompetens"},
-                color_discrete_sequence=["#2563eb", "#10b981", "#6366f1", "#f59e0b", "#ec4899", "#06b6d4"],
-            )
-            fig_ts.update_layout(
-                height=420,
-                font={"family": "Inter, sans-serif"},
-                margin=dict(l=10, r=20, t=40, b=20),
-                legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
-            )
-            st.plotly_chart(fig_ts, use_container_width=True, theme="streamlit")
-        else:
-            st.info("Ingen kompetenshistorik tillgänglig.")
+        # Row 2: Top 6 Tech Time Series (left) & Growth Barometer (right) - Balanced
+        col_t3, col_t4 = st.columns(2)
+        with col_t3:
+            skills_ts_df = get_top_skills_time_series(db, location=selected_location, top_n=6)
+            if not skills_ts_df.empty:
+                fig_ts = px.line(
+                    skills_ts_df,
+                    x="month",
+                    y="count",
+                    color="skill",
+                    title="Kompetensutveckling över tid: Topp 6 teknologier",
+                    labels={"month": "Månad", "count": "Efterfrågan (annonser)", "skill": "Kompetens"},
+                    color_discrete_sequence=["#2563eb", "#10b981", "#6366f1", "#f59e0b", "#ec4899", "#06b6d4"],
+                )
+                style_chart(fig_ts, height=380, show_legend=True)
+                fig_ts.update_layout(legend=dict(orientation="h", yanchor="bottom", y=-0.32, xanchor="center", x=0.5))
+                st.plotly_chart(fig_ts, use_container_width=True)
+            else:
+                st.info("Ingen kompetenshistorik tillgänglig.")
 
-    with col_t4:
-        growth_df = get_skill_growth_barometer(db, location=selected_location)
-        if not growth_df.empty:
-            fig_growth = px.bar(
-                growth_df,
-                x="growth_pct",
-                y="skill",
-                orientation="h",
-                title="Tillväxtbarometer: Snabbast växande kompetenser (%)",
-                labels={"growth_pct": "Tillväxt (%)", "skill": "Kompetens"},
-                color="growth_pct",
-                color_continuous_scale=["#93c5fd", "#2563eb", "#1d4ed8"],
-            )
-            fig_growth.update_layout(
-                yaxis={"categoryorder": "total ascending"},
-                height=420,
-                font={"family": "Inter, sans-serif"},
-                margin=dict(l=10, r=20, t=40, b=20),
-                coloraxis_showscale=False,
-            )
-            st.plotly_chart(fig_growth, use_container_width=True, theme="streamlit")
+        with col_t4:
+            growth_df = get_skill_growth_barometer(db, location=selected_location)
+            if not growth_df.empty:
+                fig_growth = px.bar(
+                    growth_df,
+                    x="growth_pct",
+                    y="skill",
+                    orientation="h",
+                    title="Tillväxtbarometer: Snabbast växande kompetenser (%)",
+                    labels={"growth_pct": "Tillväxt (%)", "skill": "Kompetens"},
+                    color="growth_pct",
+                    color_continuous_scale=["#93c5fd", "#2563eb", "#1d4ed8"],
+                )
+                fig_growth.update_layout(yaxis={"categoryorder": "total ascending"})
+                style_chart(fig_growth, height=380, show_legend=False)
+                fig_growth.update_layout(coloraxis_showscale=False)
+                st.plotly_chart(fig_growth, use_container_width=True)
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # 3. Third row: Strategic Foresight Note for Leadership
-    st.markdown(
-        """
-        <div class="strategy-card">
-            <div class="strategy-header">
-                <span class="strategy-name">Strategisk Marknadsspaning & Prognos</span>
-                <span class="priority-pill p-strategic">Ledningsanalys</span>
+        # Strategic Foresight Note
+        st.markdown(
+            """
+            <div class="strategy-card">
+                <div class="strategy-header">
+                    <span class="strategy-name">Strategisk Marknadsspaning för Ledningsgruppen</span>
+                    <span class="priority-pill p-strategic">Ledningsanalys</span>
+                </div>
+                <div style="font-size: 0.88rem; opacity: 0.82; line-height: 1.6;">
+                    1. <strong>Cybersäkerhet & Plattform (+62% till +100% tillväxt):</strong> Den starkaste tillväxtvektorn i regionen. Drivs av regulatoriska EU-direktiv (NIS2/DORA) samt industriell modernisering mot mikrotjänster.<br>
+                    2. <strong>Försvar & Fordon (C++ / Embedded +35.7%):</strong> Linköpings flyg- och försvarskluster (Saab Gripen) och Södertäljes fordonskluster (Scania elektrifiering) uppvisar en strukturell tillväxt som är stabil över konjunkturcykler.<br>
+                    3. <strong>Säsongseffekter för säljteamet:</strong> Efterfrågan toppar historiskt kraftigt i <strong>oktober och mars</strong>. Resursplanering och konsultpitchar bör intensifieras 3–4 veckor före dessa toppar för att maximera beläggningen.
+                </div>
             </div>
-            <div style="font-size: 0.88rem; opacity: 0.82; line-height: 1.6;">
-                1. <strong>Cybersäkerhet & Plattform (+62% till +100% tillväxt):</strong> Den starkaste tillväxtvektorn i regionen. Drivs av regulatoriska EU-direktiv (NIS2/DORA) samt industriell modernisering mot microservices.<br>
-                2. <strong>Försvar & Fordon (C++ / Embedded +35.7%):</strong> Linköpings flyg- och försvarskluster (Saab Gripen) och Södertäljes fordonskluster (Scania elektrifiering) uppvisar en strukturell tillväxt som är oberoende av allmänna konjunktursvängningar.<br>
-                3. <strong>Säsongseffekter för säljteamet:</strong> Efterfrågan toppar historiskt kraftigt i <strong>oktober och mars</strong>. Resursplanering och konsultpitchar bör intensifieras 3–4 veckor före dessa toppar (i slutet av augusti och i februari) för att maximera beläggningen.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
 
-# ----------------- VIEW 5: STRATEGISKT BESLUTSUNDERLAG -----------------
-elif current_view == "Strategiskt Beslutsunderlag":
-    st.markdown("##### Strategiska prioriteringar för ledningen")
-    st.caption("Sammanfattande marknadsanalys och affärsrekommendationer baserat på aggregerade data.")
-    
-    st.markdown(
-        """
-        <div class="strategy-card">
-            <div class="strategy-header">
-                <span class="strategy-name">1. Molninfrastruktur & DevOps (Azure, Terraform, Kubernetes)</span>
-                <span class="priority-pill p-high">Hög prioritet</span>
-            </div>
-            <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
-                Azure och automation fortsätter att vara det dominerande teknikbehovet i regionen, framförallt inom industri och offentlig förvaltning med bas i Linköping och Norrköping.
-            </div>
-            <div class="action-note">
-                <strong>Ledningsåtgärd:</strong> Prioritera certifiering av befintliga konsulter (Azure Solutions Architect, DevOps Engineer) och inrikta senior rekrytering mot plattformsarkitektur.
-            </div>
-        </div>
+    with tab_strategy:
+        st.markdown("##### Strategiska Prioriteringar för Ledningen")
+        st.caption("Sammanfattande marknadsanalys och konkreta affärsrekommendationer för ledningsgruppen.")
 
-        <div class="strategy-card">
-            <div class="strategy-header">
-                <span class="strategy-name">2. Inbyggda och säkerhetskritiska system (C++, Linux, Försvarssektorn)</span>
-                <span class="priority-pill p-growth">Tillväxtsegment</span>
+        st.markdown(
+            """
+            <div class="strategy-card">
+                <div class="strategy-header">
+                    <span class="strategy-name">1. Molninfrastruktur & DevOps (Azure, Terraform, Kubernetes)</span>
+                    <span class="priority-pill p-high">Hög prioritet</span>
+                </div>
+                <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
+                    Azure och automation fortsätter att vara det dominerande teknikbehovet i regionen, framförallt inom industri och offentlig förvaltning med bas i Linköping och Norrköping.
+                </div>
+                <div class="action-note">
+                    <strong>Ledningsåtgärd:</strong> Prioritera certifiering av befintliga konsulter (Azure Solutions Architect, DevOps Engineer) och inrikta senior rekrytering mot plattformsarkitektur.
+                </div>
             </div>
-            <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
-                Linköpings starka försvars- och säkerhetskluster uppvisar en ihållande hög efterfrågan på systemnära utvecklare. Uppdragen ställer regelmässigt krav på svenskt medborgarskap och godkänd säkerhetsprövning.
-            </div>
-            <div class="action-note">
-                <strong>Ledningsåtgärd:</strong> Etablera dedikerade kandidatpooler med förhandskontrollerad säkerhetsstatus inför kommande ramavtalstilldelningar.
-            </div>
-        </div>
 
-        <div class="strategy-card">
-            <div class="strategy-header">
-                <span class="strategy-name">3. Informationssäkerhet & Compliance (NIS2, ISO 27001)</span>
-                <span class="priority-pill p-strategic">Strategisk rådgivning</span>
+            <div class="strategy-card">
+                <div class="strategy-header">
+                    <span class="strategy-name">2. Inbyggda och säkerhetskritiska system (C++, Linux, Försvarssektorn)</span>
+                    <span class="priority-pill p-growth">Tillväxtsegment</span>
+                </div>
+                <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
+                    Linköpings starka försvars- och säkerhetskluster uppvisar en ihållande hög efterfrågan på systemnära utvecklare. Uppdragen ställer regelmässigt krav på svenskt medborgarskap och godkänd säkerhetsprövning.
+                </div>
+                <div class="action-note">
+                    <strong>Ledningsåtgärd:</strong> Etablera dedikerade kandidatpooler med förhandskontrollerad säkerhetsstatus inför kommande ramavtalstilldelningar.
+                </div>
             </div>
-            <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
-                Implementeringen av NIS2-direktivet driver en kraftigt ökad efterfrågan på rådgivning och gapanalyser hos både kommunala bolag och samhällsviktiga leverantörer.
-            </div>
-            <div class="action-note">
-                <strong>Ledningsåtgärd:</strong> Paketera proaktiva rådgivningsinsatser mot ledningsgrupper i medelstora regionala bolag för att öppna dörrar till bredare IT-uppdrag.
-            </div>
-        </div>
 
-        <div class="strategy-card">
-            <div class="strategy-header">
-                <span class="strategy-name">4. Data Analytics & Dataplattformar (Databricks, Power BI, Python)</span>
-                <span class="priority-pill p-stable">Etablerat behov</span>
+            <div class="strategy-card">
+                <div class="strategy-header">
+                    <span class="strategy-name">3. Informationssäkerhet & Compliance (NIS2, ISO 27001)</span>
+                    <span class="priority-pill p-strategic">Strategisk rådgivning</span>
+                </div>
+                <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
+                    Implementeringen av NIS2-direktivet driver en kraftigt ökad efterfrågan på rådgivning och gapanalyser hos både kommunala bolag och samhällsviktiga leverantörer.
+                </div>
+                <div class="action-note">
+                    <strong>Ledningsåtgärd:</strong> Paketera proaktiva rådgivningsinsatser mot ledningsgrupper i medelstora regionala bolag för att öppna dörrar till bredare IT-uppdrag.
+                </div>
             </div>
-            <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
-                Flera ledande industrier i Norrköping konsoliderar sin datainfrastruktur mot moderna Data Lakehouses för att möjliggöra avancerad analys och maskininlärning.
-            </div>
-            <div class="action-note">
-                <strong>Ledningsåtgärd:</strong> Positionera erbjudandet kring helhetslösningar inom data engineering snarare än enskilda rapportbyggen.
-            </div>
-        </div>
 
-        <div class="strategy-card">
-            <div class="strategy-header">
-                <span class="strategy-name">5. Fordonselektrifiering & Life Science (Södertälje & Nyköping)</span>
-                <span class="priority-pill p-growth">Expansionsområde</span>
+            <div class="strategy-card">
+                <div class="strategy-header">
+                    <span class="strategy-name">4. Data Analytics & Dataplattformar (Databricks, Power BI, Python)</span>
+                    <span class="priority-pill p-stable">Etablerat behov</span>
+                </div>
+                <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
+                    Flera ledande industrier i Norrköping konsoliderar sin datainfrastruktur mot moderna Data Lakehouses för att möjliggöra avancerad analys och maskininlärning.
+                </div>
+                <div class="action-note">
+                    <strong>Ledningsåtgärd:</strong> Positionera erbjudandet kring helhetslösningar inom data engineering snarare än enskilda rapportbyggen.
+                </div>
             </div>
-            <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
-                Scania- och AstraZeneca-klustren i Södertälje samt industrin kring Nyköping skapar stor efterfrågan inom fordonsprogramvara (AUTOSAR, C++, diagnostik, Linux) och validerade Life Science-molnplattformar.
-            </div>
-            <div class="action-note">
-                <strong>Ledningsåtgärd:</strong> Rikta konsultbearbetning mot fordons- och automationsbolag i Södertälje- och Nyköpingsregionen som komplement till Mjärdevi- och SAAB-affärerna.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
-# ----------------- VIEW 6: VECKORAPPORT & LEDNINGSBREV -----------------
+            <div class="strategy-card">
+                <div class="strategy-header">
+                    <span class="strategy-name">5. Fordonselektrifiering & Life Science (Södertälje & Nyköping)</span>
+                    <span class="priority-pill p-growth">Expansionsområde</span>
+                </div>
+                <div style="font-size: 0.88rem; opacity: 0.8; line-height: 1.5;">
+                    Scania- och AstraZeneca-klustren i Södertälje samt industrin kring Nyköping skapar stor efterfrågan inom fordonsprogramvara (AUTOSAR, C++, diagnostik, Linux) och validerade Life Science-molnplattformar.
+                </div>
+                <div class="action-note">
+                    <strong>Ledningsåtgärd:</strong> Rikta konsultbearbetning mot fordons- och automationsbolag i Södertälje- och Nyköpingsregionen som komplement till Mjärdevi- och SAAB-affärerna.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+# ----------------- VIEW 5: LEDNINGSRAPPORT & VECKOBREV -----------------
 elif current_view == "Ledningsrapport & Veckobrev":
     st.markdown("##### Veckorapport: Marknadsintelligens för ledningen")
     st.caption("Aggregerad sammanställning av den senaste veckans uppdragsflöde, heta leads och kompetenstrender.")
@@ -1200,8 +1200,7 @@ elif current_view == "Ledningsrapport & Veckobrev":
             mime="text/html",
             use_container_width=True,
         )
-    from dotenv import load_dotenv
-    load_dotenv(override=True)
+
     current_env_webhook = os.getenv("TEAMS_WEBHOOK_URL", "").strip()
 
     with col_btn_teams:
@@ -1221,7 +1220,7 @@ elif current_view == "Ledningsrapport & Veckobrev":
 
         st.markdown(
             """
-            1. **I Teams:** Gå till den kanal där du vill få rapporterna -> Klicka på `...` -> Välj **Arbetsflöden (Workflows)**.
+            1. **I Teams:** Gå till kanalen där du vill få rapporterna -> Klicka på `...` -> Välj **Arbetsflöden (Workflows)**.
             2. Sök efter mallen **"webhook"** och välj *"Send webhook alerts to a channel"* (eller *"Skicka webhook-aviseringar till en kanal"*).
             3. Kopiera den genererade webhook-länken och klistra in den nedan.
             """
