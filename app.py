@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -22,6 +23,7 @@ from analytics.weekly_digest import (
     format_markdown_digest,
     format_html_digest,
     send_slack_notification,
+    send_teams_notification,
 )
 from analytics.historical_analytics import (
     get_monthly_volume_trend,
@@ -1200,7 +1202,7 @@ elif current_view == "Ledningsrapport & Veckobrev":
 
     st.markdown("---")
 
-    col_btn_md, col_btn_html, col_btn_slack = st.columns([1, 1, 2])
+    col_btn_md, col_btn_html, col_btn_teams = st.columns([1, 1, 2])
     with col_btn_md:
         st.download_button(
             label="Ladda ner Markdown (.md)",
@@ -1217,12 +1219,37 @@ elif current_view == "Ledningsrapport & Veckobrev":
             mime="text/html",
             use_container_width=True,
         )
-    with col_btn_slack:
-        if st.button("Skicka rapport till Slack/Teams-webhook", use_container_width=True):
-            if send_slack_notification(digest_md):
-                st.success("Veckorapporten har skickats till webhooken!")
+    with col_btn_teams:
+        if st.button("Skicka rapport till Microsoft Teams nu", use_container_width=True):
+            if send_teams_notification(digest_md):
+                st.success("Veckorapporten har skickats till din Microsoft Teams-kanal!")
             else:
-                st.info("Ingen 'SLACK_WEBHOOK_URL' är konfigurerad i .env eller GitHub Secrets än.")
+                st.warning("Kunde inte skicka. Kontrollera att din TEAMS_WEBHOOK_URL är konfigurerad nedan.")
+
+    # Expandable Microsoft Teams Webhook Configuration box
+    with st.expander("Koppla & Konfigurera Microsoft Teams Webhook"):
+        st.markdown(
+            """
+            Koppla ihop valfri kanal i Microsoft Teams för automatiserade rapporter varje måndag:
+            1. **I Teams:** Gå till den kanal där du vill få rapporterna -> Klicka på `...` -> Välj **Arbetsflöden (Workflows)**.
+            2. Välj mallen *"Publicera i en kanal när en webhook-begäran tas emot"* (Post to a channel when a webhook request is received).
+            3. Kopiera den genererade webhook-länken och klistra in den nedan.
+            """
+        )
+        current_env_webhook = os.getenv("TEAMS_WEBHOOK_URL", "")
+        custom_teams_url = st.text_input(
+            "Teams Webhook URL",
+            value=current_env_webhook,
+            placeholder="https://prod-xx.westeurope.logic.azure.com:443/workflows/... eller https://outlook.office.com/webhook/...",
+        )
+        if st.button("Skicka testmeddelande till denna Teams-länk"):
+            if custom_teams_url.strip():
+                if send_teams_notification(digest_md, webhook_url=custom_teams_url.strip()):
+                    st.success("Testrapporten levererades till Microsoft Teams! Kontrollera din kanal nu.")
+                else:
+                    st.error("Kunde inte skicka. Kontrollera att länken är komplett kopierad från Teams.")
+            else:
+                st.warning("Klistra in en Teams Webhook URL i rutan först.")
 
     st.markdown("##### Förhandsgranskning av veckorapporten")
     st.markdown(digest_md)

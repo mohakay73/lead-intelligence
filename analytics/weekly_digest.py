@@ -216,8 +216,70 @@ def format_html_digest(data: Dict[str, Any]) -> str:
 </html>"""
 
 
+def send_teams_notification(markdown_content: str, webhook_url: Optional[str] = None) -> bool:
+    """
+    Dispatches report to Microsoft Teams webhook.
+    Supports both Modern Teams Workflows (Power Automate) and Classic Office 365 Connector webhooks.
+    """
+    url = webhook_url or os.getenv("TEAMS_WEBHOOK_URL") or os.getenv("SLACK_WEBHOOK_URL")
+    if not url:
+        return False
+
+    headers = {"Content-Type": "application/json"}
+
+    # 1. Modern Teams Workflows (Logic Apps / Power Automate) payload
+    if "logic.azure.com" in url or "powerautomate" in url:
+        payload = {
+            "type": "message",
+            "attachments": [
+                {
+                    "contentType": "application/vnd.microsoft.card.adaptive",
+                    "content": {
+                        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                        "type": "AdaptiveCard",
+                        "version": "1.4",
+                        "body": [
+                            {
+                                "type": "TextBlock",
+                                "text": "🎯 **Ledningsrapport: Marknadsintelligens**",
+                                "weight": "Bolder",
+                                "size": "Large",
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": markdown_content,
+                                "wrap": True,
+                            },
+                        ],
+                    },
+                }
+            ],
+        }
+    else:
+        # 2. Classic Office 365 Connector / MessageCard format
+        payload = {
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions",
+            "themeColor": "2563EB",
+            "summary": "Ledningsrapport: Marknadsintelligens",
+            "title": "🎯 Ledningsrapport: Marknadsintelligens (Östergötland, Södertälje & Nyköping)",
+            "text": markdown_content,
+        }
+
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=12)
+        if res.status_code in [200, 201, 202]:
+            return True
+        # Fallback to simple text payload
+        res_fallback = requests.post(url, json={"text": markdown_content}, timeout=10)
+        return res_fallback.status_code in [200, 201, 202]
+    except Exception as e:
+        logger.error(f"Error sending Teams notification: {e}")
+        return False
+
+
 def send_slack_notification(markdown_content: str, webhook_url: Optional[str] = None) -> bool:
-    """Dispatches report to Slack/Teams webhook."""
+    """Dispatches report to Slack webhook."""
     url = webhook_url or os.getenv("SLACK_WEBHOOK_URL")
     if not url:
         return False
@@ -238,17 +300,23 @@ def run_weekly_digest() -> Dict[str, Any]:
         md = format_markdown_digest(data)
         html = format_html_digest(data)
         
-        # Check if Slack/Teams webhook is configured
+        # Check if Teams or Slack webhook is configured
+        teams_sent = False
+        if os.getenv("TEAMS_WEBHOOK_URL"):
+            teams_sent = send_teams_notification(md)
+            logger.info(f"Teams webhook notification sent: {teams_sent}")
+
         slack_sent = False
         if os.getenv("SLACK_WEBHOOK_URL"):
             slack_sent = send_slack_notification(md)
-            logger.info(f"Webhook notification sent: {slack_sent}")
+            logger.info(f"Slack webhook notification sent: {slack_sent}")
             
         return {
             "status": "success",
             "data": data,
             "markdown": md,
             "html": html,
+            "teams_sent": teams_sent,
             "slack_sent": slack_sent,
         }
     finally:

@@ -28,6 +28,7 @@ jobs:
       - name: Run Executive Weekly Digest
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           python -m analytics.weekly_digest

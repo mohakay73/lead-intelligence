@@ -50,5 +50,9 @@ TARGET_MUNICIPALITIES = {
     "0181": "Södertälje",
 }
 
+# Webhooks (Slack / Microsoft Teams)
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
+TEAMS_WEBHOOK_URL = os.getenv("TEAMS_WEBHOOK_URL", "")
+
 # JobTech Taxonomy occupation-field for IT / Data
 IT_OCCUPATION_FIELD = "apaJ_2ja_LuF"
