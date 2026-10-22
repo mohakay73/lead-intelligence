@@ -381,8 +381,8 @@ FUNCTION_VIEWS = [
     "Ledningsrapport & Veckobrev",
 ]
 
-if "app_view" not in st.session_state or st.session_state.app_view not in FUNCTION_VIEWS:
-    st.session_state.app_view = FUNCTION_VIEWS[0]
+if "selected_workspace_view" not in st.session_state or st.session_state.selected_workspace_view not in FUNCTION_VIEWS:
+    st.session_state.selected_workspace_view = FUNCTION_VIEWS[0]
 
 # ----------------- SIDEBAR -----------------
 st.sidebar.markdown(
@@ -396,15 +396,12 @@ st.sidebar.markdown(
 )
 
 st.sidebar.markdown("**Arbetsvy**")
-current_index = FUNCTION_VIEWS.index(st.session_state.app_view) if st.session_state.app_view in FUNCTION_VIEWS else 0
-selected_view = st.sidebar.radio(
-    "Välj vy",
+current_view = st.sidebar.radio(
+    "Arbetsvy",
     FUNCTION_VIEWS,
-    index=current_index,
+    key="selected_workspace_view",
     label_visibility="collapsed",
 )
-st.session_state.app_view = selected_view
-current_view = selected_view
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Filter**")
