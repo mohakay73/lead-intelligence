@@ -5,7 +5,7 @@ across Östergötland, Södertälje & Nyköping (2022 - present).
 """
 from typing import Dict, Any, List
 import pandas as pd
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, literal_column
 from sqlalchemy.orm import Session
 from database.models import Lead, Skill, lead_skills
 
@@ -23,8 +23,8 @@ def get_monthly_volume_trend(db: Session, location: str = "Alla") -> pd.DataFram
         query = query.filter(Lead.location.ilike(f"%{location}%"))
 
     results = (
-        query.group_by(func.to_char(Lead.published_at, "YYYY-MM"))
-        .order_by(func.to_char(Lead.published_at, "YYYY-MM"))
+        query.group_by(literal_column("month"))
+        .order_by(literal_column("month"))
         .all()
     )
 
@@ -81,10 +81,10 @@ def get_top_skills_time_series(
 
     results = (
         trend_query.group_by(
-            func.to_char(Lead.published_at, "YYYY-MM"),
+            literal_column("month"),
             Skill.name,
         )
-        .order_by(func.to_char(Lead.published_at, "YYYY-MM"))
+        .order_by(literal_column("month"))
         .all()
     )
 
@@ -153,7 +153,11 @@ def get_seasonal_pattern(db: Session, location: str = "Alla") -> pd.DataFrame:
     if location and location != "Alla":
         query = query.filter(Lead.location.ilike(f"%{location}%"))
 
-    results = query.group_by(extract("month", Lead.published_at)).all()
+    results = (
+        query.group_by(literal_column("month_num"))
+        .order_by(literal_column("month_num"))
+        .all()
+    )
     if not results:
         return pd.DataFrame(columns=["month_name", "count"])
 

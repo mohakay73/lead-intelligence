@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 import pandas as pd
-from sqlalchemy import func
+from sqlalchemy import func, literal_column
 from sqlalchemy.orm import Session
 from database.connection import SessionLocal
 from database.models import Lead, Skill, lead_skills, MarketFeature
@@ -28,8 +28,8 @@ def extract_monthly_time_series(db: Session, location: str = "Alla") -> pd.DataF
         query = query.filter(Lead.location.ilike(f"%{location}%"))
 
     results = (
-        query.group_by(func.to_char(Lead.published_at, "YYYY-MM"))
-        .order_by(func.to_char(Lead.published_at, "YYYY-MM"))
+        query.group_by(literal_column("period"))
+        .order_by(literal_column("period"))
         .all()
     )
 
@@ -60,8 +60,8 @@ def compute_skill_distribution_per_month(db: Session, location: str = "Alla") ->
         query = query.filter(Lead.location.ilike(f"%{location}%"))
 
     results = (
-        query.group_by(func.to_char(Lead.published_at, "YYYY-MM"), Skill.name)
-        .order_by(func.to_char(Lead.published_at, "YYYY-MM"))
+        query.group_by(literal_column("period"), Skill.name)
+        .order_by(literal_column("period"))
         .all()
     )
 
