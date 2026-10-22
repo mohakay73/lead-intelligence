@@ -337,9 +337,22 @@ def style_chart(fig, height=380, show_legend=True):
         font=dict(family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size=12),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=10, r=20, t=35, b=25),
+        margin=dict(l=10, r=20, t=10, b=25),
         showlegend=show_legend,
     )
+    if show_legend:
+        fig.update_layout(
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                title=None,
+                font=dict(size=11),
+            ),
+            margin=dict(l=10, r=20, t=32, b=25),
+        )
     fig.update_xaxes(showgrid=True, gridcolor="rgba(128,128,128,0.12)", zeroline=False)
     fig.update_yaxes(showgrid=True, gridcolor="rgba(128,128,128,0.12)", zeroline=False)
     return fig
@@ -350,7 +363,7 @@ def style_pie(fig, height=360):
         font=dict(family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size=12),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=10, r=10, t=35, b=25),
+        margin=dict(l=10, r=10, t=15, b=20),
         showlegend=False,
     )
     return fig
@@ -496,43 +509,41 @@ if current_view == "Marknadsöversikt & Efterfrågan":
     # Row 1: Competencies (left) & Top Employers (right) - Balanced Bar Charts
     col_skills, col_emp = st.columns(2)
     with col_skills:
+        loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
+        st.markdown(f"###### Mest efterfrågade kompetenser ({loc_label})")
         skill_df = get_skill_demand(db, location=selected_location, source=selected_source, top_n=12)
         if not skill_df.empty:
-            loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
             fig_skills = px.bar(
                 skill_df,
                 x="count",
                 y="skill",
                 orientation="h",
                 color="category",
-                title=f"Mest efterfrågade kompetenser ({loc_label})",
                 labels={"count": "Behov", "skill": "Kompetens", "category": "Kategori"},
                 color_discrete_sequence=["#2563eb", "#10b981", "#6366f1", "#f59e0b", "#06b6d4", "#ec4899"],
             )
             fig_skills.update_layout(yaxis={"categoryorder": "total ascending"})
-            style_chart(fig_skills, height=400, show_legend=True)
-            fig_skills.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0))
+            style_chart(fig_skills, height=390, show_legend=True)
             st.plotly_chart(fig_skills, use_container_width=True)
         else:
             st.info("Ingen kompetensdata tillgänglig för det valda filtret.")
 
     with col_emp:
+        loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
+        st.markdown(f"###### Mest aktiva uppdragsgivare ({loc_label})")
         top_emp_df = get_top_employers(db, location=selected_location, source=selected_source, limit=12)
         if not top_emp_df.empty:
-            loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
             fig_emp = px.bar(
                 top_emp_df,
                 x="count",
                 y="company",
                 orientation="h",
                 color="location",
-                title=f"Mest aktiva uppdragsgivare ({loc_label})",
                 labels={"company": "Organisation", "count": "Behov", "location": "Ort"},
                 color_discrete_sequence=["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"],
             )
             fig_emp.update_layout(yaxis={"categoryorder": "total ascending"})
-            style_chart(fig_emp, height=400, show_legend=True)
-            fig_emp.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0))
+            style_chart(fig_emp, height=390, show_legend=True)
             st.plotly_chart(fig_emp, use_container_width=True)
         else:
             st.info("Inga arbetsgivare matchar det valda filtret.")
@@ -542,35 +553,35 @@ if current_view == "Marknadsöversikt & Efterfrågan":
     # Row 2: Geography (left) & Technical Verticals (right) - Balanced Donut Charts
     col_geo, col_cat = st.columns(2)
     with col_geo:
+        st.markdown("###### Geografisk fördelning av uppdrag")
         loc_df = get_location_distribution(db, source=selected_source)
         if not loc_df.empty:
             fig_loc = px.pie(
                 loc_df,
                 values="count",
                 names="location",
-                title="Geografisk fördelning av uppdrag",
                 hole=0.55,
                 color_discrete_sequence=["#2563eb", "#3b82f6", "#10b981", "#06b6d4", "#f59e0b", "#8b5cf6", "#ec4899", "#cbd5e1"],
             )
             fig_loc.update_traces(textposition="inside", textinfo="percent+label")
-            style_pie(fig_loc, height=360)
+            style_pie(fig_loc, height=350)
             st.plotly_chart(fig_loc, use_container_width=True)
         else:
             st.info("Ingen ortsdata tillgänglig.")
 
     with col_cat:
+        st.markdown("###### Fördelning per tekniskt område")
         cat_df = get_category_distribution(db, location=selected_location, source=selected_source)
         if not cat_df.empty:
             fig_cat = px.pie(
                 cat_df,
                 values="count",
                 names="category",
-                title="Fördelning per tekniskt område",
                 hole=0.55,
                 color_discrete_sequence=["#2563eb", "#059669", "#7c3aed", "#d97706", "#db2777"],
             )
             fig_cat.update_traces(textposition="inside", textinfo="percent+label")
-            style_pie(fig_cat, height=360)
+            style_pie(fig_cat, height=350)
             st.plotly_chart(fig_cat, use_container_width=True)
         else:
             st.info("Ingen kategoridata tillgänglig.")
@@ -933,14 +944,13 @@ elif current_view == "Marknadsprognos & Trender":
             ))
 
             loc_label = selected_location if selected_location != "Alla" else "Hela regionen (Östergötland, Södertälje & Nyköping)"
+            st.markdown(f"###### Marknadsprognos & Efterfrågebana ({loc_label})")
             fig_fc.update_layout(
-                title=f"Marknadsprognos & Efterfrågebana ({loc_label})",
                 xaxis_title="Period (Månad)",
                 yaxis_title="Antal IT-behov / Uppdrag",
                 hovermode="x unified",
             )
-            style_chart(fig_fc, height=400, show_legend=True)
-            fig_fc.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0))
+            style_chart(fig_fc, height=390, show_legend=True)
             st.plotly_chart(fig_fc, use_container_width=True)
 
             st.markdown("---")
@@ -997,36 +1007,36 @@ elif current_view == "Marknadsprognos & Trender":
         # Row 1: Monthly Trend (left) & Seasonality (right) - Balanced
         col_t1, col_t2 = st.columns(2)
         with col_t1:
+            loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
+            st.markdown(f"###### Volymtrend månad för månad ({loc_label})")
             vol_df = get_monthly_volume_trend(db, location=selected_location)
             if not vol_df.empty:
-                loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
                 fig_vol = px.line(
                     vol_df,
                     x="month",
                     y="postings",
-                    title=f"Volymtrend månad för månad ({loc_label})",
                     labels={"month": "Månad", "postings": "Annonserade IT-positioner"},
                     markers=True,
                     color_discrete_sequence=["#2563eb"],
                 )
-                style_chart(fig_vol, height=380, show_legend=False)
+                style_chart(fig_vol, height=360, show_legend=False)
                 st.plotly_chart(fig_vol, use_container_width=True)
             else:
                 st.info("Ingen historisk volymdata tillgänglig för valt filter.")
 
         with col_t2:
+            st.markdown("###### Säsongsmönster: När rekryterar kunderna som mest?")
             season_df = get_seasonal_pattern(db, location=selected_location)
             if not season_df.empty:
                 fig_season = px.bar(
                     season_df,
                     x="month_name",
                     y="count",
-                    title="Säsongsmönster: När rekryterar kunderna som mest?",
                     labels={"month_name": "Kalendermånad", "count": "Sammanlagd volym"},
                     color="count",
                     color_continuous_scale="Blues",
                 )
-                style_chart(fig_season, height=380, show_legend=False)
+                style_chart(fig_season, height=360, show_legend=False)
                 fig_season.update_layout(coloraxis_showscale=False)
                 st.plotly_chart(fig_season, use_container_width=True)
 
@@ -1035,6 +1045,7 @@ elif current_view == "Marknadsprognos & Trender":
         # Row 2: Top 6 Tech Time Series (left) & Growth Barometer (right) - Balanced
         col_t3, col_t4 = st.columns(2)
         with col_t3:
+            st.markdown("###### Kompetensutveckling över tid: Topp 6 teknologier")
             skills_ts_df = get_top_skills_time_series(db, location=selected_location, top_n=6)
             if not skills_ts_df.empty:
                 fig_ts = px.line(
@@ -1042,17 +1053,17 @@ elif current_view == "Marknadsprognos & Trender":
                     x="month",
                     y="count",
                     color="skill",
-                    title="Kompetensutveckling över tid: Topp 6 teknologier",
                     labels={"month": "Månad", "count": "Efterfrågan (annonser)", "skill": "Kompetens"},
                     color_discrete_sequence=["#2563eb", "#10b981", "#6366f1", "#f59e0b", "#ec4899", "#06b6d4"],
                 )
-                style_chart(fig_ts, height=380, show_legend=True)
-                fig_ts.update_layout(legend=dict(orientation="h", yanchor="bottom", y=-0.32, xanchor="center", x=0.5))
+                style_chart(fig_ts, height=360, show_legend=True)
+                fig_ts.update_layout(legend=dict(orientation="h", yanchor="top", y=-0.25, xanchor="center", x=0.5, title=None))
                 st.plotly_chart(fig_ts, use_container_width=True)
             else:
                 st.info("Ingen kompetenshistorik tillgänglig.")
 
         with col_t4:
+            st.markdown("###### Tillväxtbarometer: Snabbast växande kompetenser (%)")
             growth_df = get_skill_growth_barometer(db, location=selected_location)
             if not growth_df.empty:
                 fig_growth = px.bar(
@@ -1060,13 +1071,12 @@ elif current_view == "Marknadsprognos & Trender":
                     x="growth_pct",
                     y="skill",
                     orientation="h",
-                    title="Tillväxtbarometer: Snabbast växande kompetenser (%)",
                     labels={"growth_pct": "Tillväxt (%)", "skill": "Kompetens"},
                     color="growth_pct",
                     color_continuous_scale=["#93c5fd", "#2563eb", "#1d4ed8"],
                 )
                 fig_growth.update_layout(yaxis={"categoryorder": "total ascending"})
-                style_chart(fig_growth, height=380, show_legend=False)
+                style_chart(fig_growth, height=360, show_legend=False)
                 fig_growth.update_layout(coloraxis_showscale=False)
                 st.plotly_chart(fig_growth, use_container_width=True)
 
