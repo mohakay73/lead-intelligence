@@ -8,8 +8,19 @@ BASE_DIR = Path(__file__).resolve().parent
 # Load .env if present
 load_dotenv(BASE_DIR / ".env")
 
+def get_secret(key: str, default: str = "") -> str:
+    """Reads configuration from environment variables or Streamlit secrets."""
+    val = os.getenv(key, "")
+    if not val:
+        try:
+            import streamlit as st
+            val = st.secrets.get(key, "")
+        except Exception:
+            pass
+    return str(val).strip() if val else default
+
 # Database URL: default to SQLite for instant local runs, or PostgreSQL for Azure/Supabase
-raw_db_url = os.getenv("DATABASE_URL", "").strip().strip('"').strip("'")
+raw_db_url = get_secret("DATABASE_URL").strip('"').strip("'")
 if raw_db_url.startswith("DATABASE_URL="):
     raw_db_url = raw_db_url.split("DATABASE_URL=", 1)[1].strip().strip('"').strip("'")
 
@@ -21,12 +32,12 @@ else:
     DATABASE_URL = raw_db_url
 
 # JobTech API (Arbetsförmedlingen Open Data)
-JOBTECH_API_URL = os.getenv("JOBTECH_API_URL", "https://jobsearch.api.jobtechdev.se")
-JOBTECH_API_KEY = os.getenv("JOBTECH_API_KEY", "")  # Optional for basic public access
+JOBTECH_API_URL = get_secret("JOBTECH_API_URL", "https://jobsearch.api.jobtechdev.se")
+JOBTECH_API_KEY = get_secret("JOBTECH_API_KEY", "")  # Optional for basic public access
 
 # Brainville API
-BRAINVILLE_API_URL = os.getenv("BRAINVILLE_API_URL", "https://api.brainville.com/api")
-BRAINVILLE_API_KEY = os.getenv("BRAINVILLE_API_KEY", "")
+BRAINVILLE_API_URL = get_secret("BRAINVILLE_API_URL", "https://api.brainville.com/api")
+BRAINVILLE_API_KEY = get_secret("BRAINVILLE_API_KEY", "")
 
 # Regional focus (Östergötland + Nyköping & Södertälje i E4-korridoren)
 TARGET_REGION_CODE = "05"  # Östergötlands län
@@ -51,8 +62,8 @@ TARGET_MUNICIPALITIES = {
 }
 
 # Webhooks (Slack / Microsoft Teams)
-SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
-TEAMS_WEBHOOK_URL = os.getenv("TEAMS_WEBHOOK_URL", "")
+SLACK_WEBHOOK_URL = get_secret("SLACK_WEBHOOK_URL", "")
+TEAMS_WEBHOOK_URL = get_secret("TEAMS_WEBHOOK_URL", "")
 
 # JobTech Taxonomy occupation-field for IT / Data
 IT_OCCUPATION_FIELD = "apaJ_2ja_LuF"
