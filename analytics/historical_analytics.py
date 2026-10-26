@@ -98,10 +98,10 @@ def get_skill_growth_barometer(db: Session, location: str = "Alla") -> pd.DataFr
     Period 1: First half of 2024
     Period 2: Recent 6-12 months (2025 onwards)
     """
-    p1_start = "2024-01-01"
-    p1_end = "2024-06-30"
-    p2_start = "2025-01-01"
-    p2_end = "2025-06-30"
+    p1_start = datetime(2024, 1, 1)
+    p1_end = datetime(2024, 6, 30, 23, 59, 59)
+    p2_start = datetime(2025, 1, 1)
+    p2_end = datetime(2025, 6, 30, 23, 59, 59)
 
     q1 = (
         db.query(Skill.name, func.count(Lead.id).label("count_p1"))

@@ -2,8 +2,8 @@ name: Scheduled Lead Ingestion
 
 on:
   schedule:
-    # Runs every weekday at 06:00 UTC (07:00 or 08:00 Swedish time)
-    - cron: '0 6 * * 1-5'
+    # Runs every weekday at 05:20 UTC (06:20 CET Swedish time, off-peak to avoid GitHub queue delays)
+    - cron: '20 5 * * 1-5'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
@@ -32,4 +32,3 @@ jobs:
           BRAINVILLE_API_KEY: ${{ secrets.BRAINVILLE_API_KEY }}
         run: |
           python -m ingestion.pipeline
-

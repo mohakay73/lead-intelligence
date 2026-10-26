@@ -135,17 +135,22 @@ def compute_skill_momentum_forecast(db: Session, location: str = "Alla") -> List
     """
     # Period 1: 2025-05 to 2025-10
     # Period 2: 2026-05 to 2026-10
+    dt_p1_start = datetime(2025, 5, 1)
+    dt_p1_end = datetime(2025, 10, 31, 23, 59, 59)
+    dt_p2_start = datetime(2026, 5, 1)
+    dt_p2_end = datetime(2026, 10, 31, 23, 59, 59)
+
     q1 = (
         db.query(Skill.name, Skill.category, func.count(Lead.id).label("count_p1"))
         .join(lead_skills, Skill.id == lead_skills.c.skill_id)
         .join(Lead, Lead.id == lead_skills.c.lead_id)
-        .filter(Lead.published_at >= "2025-05-01", Lead.published_at <= "2025-10-31")
+        .filter(Lead.published_at >= dt_p1_start, Lead.published_at <= dt_p1_end)
     )
     q2 = (
         db.query(Skill.name, Skill.category, func.count(Lead.id).label("count_p2"))
         .join(lead_skills, Skill.id == lead_skills.c.skill_id)
         .join(Lead, Lead.id == lead_skills.c.lead_id)
-        .filter(Lead.published_at >= "2026-05-01", Lead.published_at <= "2026-10-31")
+        .filter(Lead.published_at >= dt_p2_start, Lead.published_at <= dt_p2_end)
     )
 
     if location and location != "Alla":

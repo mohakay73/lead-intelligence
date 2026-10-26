@@ -2,8 +2,8 @@ name: Bi-Weekly Market Model Retraining & Forecast
 
 on:
   schedule:
-    # Runs on the 1st and 15th of every month at 22:00 UTC (23:00 / 00:00 Swedish time)
-    - cron: '0 22 1,15 * *'
+    # Runs on the 1st and 15th of every month at 22:20 UTC (23:20 CET Swedish time)
+    - cron: '20 22 1,15 * *'
   workflow_dispatch: # Allows manual on-demand trigger from GitHub Actions tab
 
 jobs:
@@ -36,4 +36,3 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           python -m analytics.forecast_engine
-
