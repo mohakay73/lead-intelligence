@@ -1,4 +1,5 @@
 import os
+import html
 from pathlib import Path
 import streamlit as st
 import pandas as pd
@@ -563,6 +564,11 @@ def get_status_badge_html(status_val: str) -> str:
     else:
         return '<span class="status-pill status-nytt">📥 Nytt</span>'
 
+def render_html(html_str: str):
+    """Safely renders HTML without Markdown interpreting indented lines as code blocks."""
+    clean = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
+    st.markdown(clean, unsafe_allow_html=True)
+
 # ----------------- DATABASE INITIALIZATION -----------------
 init_db()
 db = SessionLocal()
@@ -646,7 +652,7 @@ st.sidebar.markdown(
 )
 
 # ----------------- GLOBAL HEADER -----------------
-st.markdown(
+render_html(
     f"""
     <div class="header-container">
         <div>
@@ -668,8 +674,7 @@ st.markdown(
         </div>
         <span style="font-size: 0.74rem; opacity: 0.65;">Uppdateras i realtid via Supabase & Schemalagd sync</span>
     </div>
-    """,
-    unsafe_allow_html=True,
+    """
 )
 
 # ----------------- VIEW 1: MARKNADSÖVERSIKT & EFTERFRÅGAN -----------------
@@ -677,7 +682,7 @@ if current_view == "Marknadsöversikt & Efterfrågan":
     kpis = get_overview_kpis(db)
 
     # Macro KPI Grid
-    st.markdown(
+    render_html(
         f"""
         <div class="metrics-grid">
             <div class="metric-box">
@@ -701,8 +706,7 @@ if current_view == "Marknadsöversikt & Efterfrågan":
                 <div class="metric-detail">Unika uppdragsgivare & företag</div>
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     # Row 1: Competencies (left) & Top Employers (right) - Balanced Bar Charts
@@ -795,70 +799,64 @@ elif current_view == "Uppdrag & Lead Pipeline":
     # 1. Pipeline Funnel Summary Bar
     col_pk1, col_pk2, col_pk3, col_pk4, col_pk5, col_pk6 = st.columns(6)
     with col_pk1:
-        st.markdown(
+        render_html(
             f"""
             <div class="funnel-metric-card">
                 <div style="font-size:0.68rem;font-weight:700;color:#64748b;text-transform:uppercase;">1. Nya Leads</div>
                 <div style="font-size:1.45rem;font-weight:800;color:inherit;line-height:1.2;">{pipe_kpis['nytt']}</div>
                 <div style="font-size:0.68rem;opacity:0.6;">Ohanterade</div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
     with col_pk2:
-        st.markdown(
+        render_html(
             f"""
             <div class="funnel-metric-card" style="border-color: rgba(245,158,11,0.3);">
                 <div style="font-size:0.68rem;font-weight:700;color:#d97706;text-transform:uppercase;">2. Granskas</div>
                 <div style="font-size:1.45rem;font-weight:800;color:#d97706;line-height:1.2;">{pipe_kpis['granskas']}</div>
                 <div style="font-size:0.68rem;opacity:0.6;">Matchning pågår</div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
     with col_pk3:
-        st.markdown(
+        render_html(
             f"""
             <div class="funnel-metric-card" style="border-color: rgba(181,34,63,0.3);">
                 <div style="font-size:0.68rem;font-weight:700;color:#B5223F;text-transform:uppercase;">3. Pitch skickad</div>
                 <div style="font-size:1.45rem;font-weight:800;color:#B5223F;line-height:1.2;">{pipe_kpis['pitch']}</div>
                 <div style="font-size:0.68rem;opacity:0.6;">Konsult presenterad</div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
     with col_pk4:
-        st.markdown(
+        render_html(
             f"""
             <div class="funnel-metric-card" style="border-color: rgba(99,102,241,0.3);">
                 <div style="font-size:0.68rem;font-weight:700;color:#6366f1;text-transform:uppercase;">4. Intervju</div>
                 <div style="font-size:1.45rem;font-weight:800;color:#6366f1;line-height:1.2;">{pipe_kpis['intervju']}</div>
                 <div style="font-size:0.68rem;opacity:0.6;">Kundmöte bokat</div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
     with col_pk5:
-        st.markdown(
+        render_html(
             f"""
             <div class="funnel-metric-card" style="border-color: rgba(16,185,129,0.3);">
                 <div style="font-size:0.68rem;font-weight:700;color:#059669;text-transform:uppercase;">5. Vunnet</div>
                 <div style="font-size:1.45rem;font-weight:800;color:#059669;line-height:1.2;">{pipe_kpis['vunnet']}</div>
                 <div style="font-size:0.68rem;opacity:0.6;">Tillsatt uppdrag</div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
     with col_pk6:
-        st.markdown(
+        render_html(
             f"""
             <div class="funnel-metric-card">
                 <div style="font-size:0.68rem;font-weight:700;color:#94a3b8;text-transform:uppercase;">Avböjt</div>
                 <div style="font-size:1.45rem;font-weight:800;color:#94a3b8;line-height:1.2;">{pipe_kpis['avböjt']}</div>
                 <div style="font-size:0.68rem;opacity:0.6;">Arkiverade</div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
     st.markdown("---")
@@ -914,7 +912,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
         source_text = "Konsultuppdrag" if lead["is_consultant"] else "Rekryteringsannons"
         status_html = get_status_badge_html(lead["status"])
 
-        skill_tags = "".join([f'<span class="skill-tag">{s}</span>' for s in lead["skills"]])
+        skill_tags = "".join([f'<span class="skill-tag">{html.escape(s)}</span>' for s in lead["skills"]])
 
         link_html = (
             f'<a href="{lead["url"]}" target="_blank" class="link-action">Visa källannons →</a>'
@@ -924,42 +922,41 @@ elif current_view == "Uppdrag & Lead Pipeline":
 
         crm_meta_items = []
         if lead["assigned_to"]:
-            crm_meta_items.append(f'<span>Ansvarig: <span class="pipeline-assignee">👤 {lead["assigned_to"]}</span></span>')
+            crm_meta_items.append(f'<span>Ansvarig: <span class="pipeline-assignee">👤 {html.escape(lead["assigned_to"])}</span></span>')
         if lead["candidate_name"]:
-            crm_meta_items.append(f'<span>Föreslagen konsult: <strong style="color:#B5223F;">⭐ {lead["candidate_name"]}</strong></span>')
+            crm_meta_items.append(f'<span>Föreslagen konsult: <strong style="color:#B5223F;">⭐ {html.escape(lead["candidate_name"])}</strong></span>')
         crm_meta_html = " • ".join(crm_meta_items) if crm_meta_items else ""
 
-        notes_html = f'<div class="pipeline-notes-box"><strong>Intern säljnotering:</strong> {lead["notes"]}</div>' if lead["notes"] else ""
+        notes_html = f'<div class="pipeline-notes-box"><strong>Intern säljnotering:</strong> {html.escape(lead["notes"])}</div>' if lead["notes"] else ""
+        desc_snippet = html.escape(lead["description"][:240]) + "..." if lead["description"] else "Detaljerad information finns i källsystemet."
 
-        st.markdown(
-            f"""
-            <div class="lead-row">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                            {status_html}
-                            <span class="tag-source {source_class}">{source_text}</span>
-                        </div>
-                        <div class="lead-title-text">{lead['title']}</div>
+        card_html = f"""
+        <div class="lead-row">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                        {status_html}
+                        <span class="tag-source {source_class}">{source_text}</span>
                     </div>
-                    <div>{link_html}</div>
+                    <div class="lead-title-text">{html.escape(lead['title'])}</div>
                 </div>
-                <div class="lead-attributes">
-                    <span>Beställare: <span class="lead-attr-strong">{lead['company_name']}</span></span>
-                    <span>Ort: <span class="lead-attr-strong">{lead['location']}</span></span>
-                    <span>Publicerad: {lead['published_at']}</span>
-                    <span>Deadline: {lead['deadline']}</span>
-                </div>
-                {f'<div style="margin-bottom: 8px; font-size: 0.82rem;">{crm_meta_html}</div>' if crm_meta_html else ''}
-                <div style="margin-bottom: 10px;">{skill_tags}</div>
-                <div style="opacity: 0.8; font-size: 0.85rem; line-height: 1.5; margin-bottom: 10px;">
-                    {lead['description'][:240] + '...' if lead['description'] else 'Detaljerad information finns i källsystemet.'}
-                </div>
-                {notes_html}
+                <div>{link_html}</div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            <div class="lead-attributes">
+                <span>Beställare: <span class="lead-attr-strong">{html.escape(lead['company_name'] or 'Konfidentiell')}</span></span>
+                <span>Ort: <span class="lead-attr-strong">{html.escape(lead['location'] or 'Östergötland')}</span></span>
+                <span>Publicerad: {html.escape(str(lead['published_at']))}</span>
+                <span>Deadline: {html.escape(str(lead['deadline']))}</span>
+            </div>
+            {f'<div style="margin-bottom: 8px; font-size: 0.82rem;">{crm_meta_html}</div>' if crm_meta_html else ''}
+            <div style="margin-bottom: 10px;">{skill_tags}</div>
+            <div style="opacity: 0.8; font-size: 0.85rem; line-height: 1.5; margin-bottom: 10px;">
+                {desc_snippet}
+            </div>
+            {notes_html}
+        </div>
+        """
+        render_html(card_html)
 
         # Action Hub: Pipeline Management & Sales Pitch
         col_act1, col_act2 = st.columns([1, 1])
@@ -1066,21 +1063,20 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
         skills_pills = "".join([f'<span class="skill-tag">{s}</span>' for s in active_consultant["skills"]])
         clearance_text = " • Säkerhetsprövad (RK3/SUA)" if active_consultant.get("clearance") else ""
         
-        st.markdown(
+        render_html(
             f"""
             <div style="background: rgba(128, 128, 128, 0.04); border: 1px solid rgba(128, 128, 128, 0.18); border-radius: 8px; padding: 18px 20px; margin-bottom: 22px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
                     <div>
-                        <div style="font-size: 1.15rem; font-weight: 700; color: inherit;">{active_consultant['name']}</div>
-                        <div style="font-size: 0.86rem; opacity: 0.8; margin-top: 2px;">{active_consultant['title']} • {active_consultant['seniority']} • {active_consultant['location']}{clearance_text}</div>
+                        <div style="font-size: 1.15rem; font-weight: 700; color: inherit;">{html.escape(active_consultant['name'])}</div>
+                        <div style="font-size: 0.86rem; opacity: 0.8; margin-top: 2px;">{html.escape(active_consultant['title'])} • {html.escape(active_consultant['seniority'])} • {html.escape(active_consultant['location'])}{html.escape(clearance_text)}</div>
                     </div>
-                    <div class="priority-pill p-growth">{active_consultant['available_from']}</div>
+                    <div class="priority-pill p-growth">{html.escape(active_consultant['available_from'])}</div>
                 </div>
-                <div style="font-size: 0.85rem; opacity: 0.85; line-height: 1.5; margin-bottom: 12px;">{active_consultant['summary']}</div>
+                <div style="font-size: 0.85rem; opacity: 0.85; line-height: 1.5; margin-bottom: 12px;">{html.escape(active_consultant['summary'])}</div>
                 <div>{skills_pills}</div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
     else:
         st.markdown("###### Egen konsultprofil")
@@ -1174,34 +1170,35 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
 
             status_badge = get_status_badge_html(lead.get("status", "Nytt"))
 
-            st.markdown(
-                f"""
-                <div class="lead-row">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
-                        <div>
-                            {score_pill} {source_tag} {status_badge}
-                            <div class="lead-title-text" style="margin-top: 6px;">{lead['title']}</div>
-                        </div>
-                        <div>
-                            {link_html}
-                        </div>
+            cand_info = f'<span>Kandidat: <span class="lead-attr-strong">{html.escape(lead["candidate_name"])}</span></span>' if lead.get("candidate_name") else ''
+            resp_info = f'<span>Ansvarig: <span class="lead-attr-strong">{html.escape(lead["assigned_to"])}</span></span>' if lead.get("assigned_to") else ''
+
+            card_html = f"""
+            <div class="lead-row">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                    <div>
+                        {score_pill} {source_tag} {status_badge}
+                        <div class="lead-title-text" style="margin-top: 6px;">{html.escape(lead['title'])}</div>
                     </div>
-                    <div class="lead-attributes">
-                        <span>Beställare: <span class="lead-attr-strong">{lead['company']}</span></span>
-                        <span>Ort: <span class="lead-attr-strong">{lead['location']}</span></span>
-                        <span>Publicerad: <span>{lead['published_at']}</span></span>
-                        {f'<span>Kandidat: <span class="lead-attr-strong">{lead["candidate_name"]}</span></span>' if lead.get("candidate_name") else ''}
-                        {f'<span>Ansvarig: <span class="lead-attr-strong">{lead["assigned_to"]}</span></span>' if lead.get("assigned_to") else ''}
-                    </div>
-                    <div style="margin-top: 8px; font-size: 0.8rem;">
-                        <div style="margin-bottom: 4px;"><strong>Matchade krav:</strong> {matched_tags if matched_tags else '<span style=\"opacity:0.6;\">Inga direkta teknikkrav</span>'}</div>
-                        {f'<div style=\"margin-bottom: 4px;\"><strong style=\"opacity:0.7;\">Övriga krav i annons:</strong> {missing_tags}</div>' if missing_tags else ''}
-                        {f'<div><strong style=\"color:#B5223F;\">Konsultens mervärde:</strong> {bonus_tags}</div>' if bonus_tags else ''}
+                    <div>
+                        {link_html}
                     </div>
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                <div class="lead-attributes">
+                    <span>Beställare: <span class="lead-attr-strong">{html.escape(lead['company'] or 'Konfidentiell')}</span></span>
+                    <span>Ort: <span class="lead-attr-strong">{html.escape(lead['location'] or 'Östergötland')}</span></span>
+                    <span>Publicerad: <span>{html.escape(str(lead['published_at']))}</span></span>
+                    {cand_info}
+                    {resp_info}
+                </div>
+                <div style="margin-top: 8px; font-size: 0.8rem;">
+                    <div style="margin-bottom: 4px;"><strong>Matchade krav:</strong> {matched_tags if matched_tags else '<span style="opacity:0.6;">Inga direkta teknikkrav</span>'}</div>
+                    {f'<div style="margin-bottom: 4px;"><strong style="opacity:0.7;">Övriga krav i annons:</strong> {missing_tags}</div>' if missing_tags else ''}
+                    {f'<div><strong style="color:#B5223F;">Konsultens mervärde:</strong> {bonus_tags}</div>' if bonus_tags else ''}
+                </div>
+            </div>
+            """
+            render_html(card_html)
 
             with st.expander(f"Generera säljpitch för {active_consultant['name']} till {lead['company']}"):
                 col_sp1, col_sp2 = st.columns([3, 1])
@@ -1347,7 +1344,7 @@ elif current_view == "Marknadsprognos & Trender":
                     )
 
                 with col_u2:
-                    st.markdown(
+                    render_html(
                         """
                         <div style="background: rgba(128, 128, 128, 0.04); border: 1px solid rgba(128, 128, 128, 0.16); border-radius: 8px; padding: 16px; font-size: 0.88rem; line-height: 1.6;">
                             <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 8px;">Ledningsåtgärder för konsultteamet:</div>
@@ -1355,8 +1352,7 @@ elif current_view == "Marknadsprognos & Trender":
                             <strong>2. Rekryteringsfokus:</strong> Styr kravprofiler för seniorrekrytering mot Cloud Architecture och NIS2-säkerhet där tillväxttakten är som högst.<br>
                             <strong>3. Kassakor:</strong> Bibehåll senior leverans inom etablerad systemutveckling (.NET, C#, C++, Python) som står för den stabila basvolymen.
                         </div>
-                        """,
-                        unsafe_allow_html=True,
+                        """
                     )
 
             col_btn_retrain, col_btn_info = st.columns([1, 3])
@@ -1474,7 +1470,7 @@ elif current_view == "Marknadsprognos & Trender":
         st.markdown("---")
 
         # Strategic Foresight Note
-        st.markdown(
+        render_html(
             """
             <div class="strategy-card">
                 <div class="strategy-header">
@@ -1487,15 +1483,14 @@ elif current_view == "Marknadsprognos & Trender":
                     3. <strong>Säsongseffekter för säljteamet:</strong> Efterfrågan toppar historiskt kraftigt i <strong>oktober och mars</strong>. Resursplanering och konsultpitchar bör intensifieras 3–4 veckor före dessa toppar för att maximera beläggningen.
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
     with tab_strategy:
         st.markdown("##### Strategiska Prioriteringar för Ledningen")
         st.caption("Sammanfattande marknadsanalys och konkreta affärsrekommendationer för ledningsgruppen.")
 
-        st.markdown(
+        render_html(
             """
             <div class="strategy-card">
                 <div class="strategy-header">
@@ -1561,8 +1556,7 @@ elif current_view == "Marknadsprognos & Trender":
                     <strong>Ledningsåtgärd:</strong> Rikta konsultbearbetning mot fordons- och automationsbolag i Södertälje- och Nyköpingsregionen som komplement till Mjärdevi- och SAAB-affärerna.
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True,
+            """
         )
 
 # ----------------- VIEW 5: LEDNINGSRAPPORT & VECKOBREV -----------------
