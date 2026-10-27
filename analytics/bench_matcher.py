@@ -175,6 +175,9 @@ def match_consultant_to_leads(
                 "pitch_subject": pitch["subject"],
                 "pitch_body": pitch["body"],
                 "description": lead.description or "",
+                "status": getattr(lead, "status", None) or "Nytt",
+                "assigned_to": getattr(lead, "assigned_to", None) or "",
+                "candidate_name": getattr(lead, "candidate_name", None) or "",
             })
 
     # Sort highest match score first

@@ -55,6 +55,13 @@ class Lead(Base):
     deadline = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Lead Pipeline & CRM Action fields
+    status = Column(String(50), nullable=True, default="Nytt", index=True)
+    assigned_to = Column(String(100), nullable=True)
+    candidate_name = Column(String(150), nullable=True)
+    notes = Column(Text, nullable=True)
+    status_updated_at = Column(DateTime, nullable=True)
+
     # Unique constraint per external source ID
     __table_args__ = (
         UniqueConstraint("source", "external_id", name="uq_source_external_id"),

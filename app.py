@@ -28,6 +28,9 @@ from analytics.trend_engine import (
     get_category_distribution,
     get_top_employers,
     get_filtered_leads,
+    get_pipeline_kpis,
+    update_lead_status,
+    get_all_assignees,
 )
 from analytics.pitch_generator import generate_sales_pitch
 from analytics.weekly_digest import (
@@ -295,6 +298,82 @@ st.markdown(
         text-decoration: underline;
     }
 
+    /* Pipeline Status Pills & CRM styles */
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .status-nytt {
+        background: rgba(148, 163, 184, 0.15);
+        color: #475569;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+    .status-granskas {
+        background: rgba(245, 158, 11, 0.14);
+        color: #d97706;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+    .status-pitch {
+        background: rgba(181, 34, 63, 0.12);
+        color: #B5223F;
+        border: 1px solid rgba(181, 34, 63, 0.35);
+    }
+    .status-intervju {
+        background: rgba(99, 102, 241, 0.14);
+        color: #6366f1;
+        border: 1px solid rgba(99, 102, 241, 0.35);
+    }
+    .status-vunnet {
+        background: rgba(16, 185, 129, 0.15);
+        color: #059669;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .status-avböjt {
+        background: rgba(100, 116, 139, 0.1);
+        color: #94a3b8;
+        border: 1px solid rgba(100, 116, 139, 0.2);
+    }
+    .pipeline-assignee {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: rgba(181, 34, 63, 0.06);
+        color: #B5223F;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        border: 1px solid rgba(181, 34, 63, 0.18);
+    }
+    .pipeline-notes-box {
+        background: rgba(128, 128, 128, 0.04);
+        border-left: 3px solid #B5223F;
+        border-radius: 0 6px 6px 0;
+        padding: 8px 12px;
+        margin-top: 8px;
+        font-size: 0.8rem;
+        line-height: 1.45;
+    }
+    .funnel-metric-card {
+        background: rgba(181, 34, 63, 0.02);
+        border: 1px solid rgba(181, 34, 63, 0.12);
+        border-radius: 10px;
+        padding: 10px 14px;
+        text-align: center;
+        transition: all 0.2s ease;
+    }
+    .funnel-metric-card:hover {
+        border-color: rgba(181, 34, 63, 0.35);
+        box-shadow: 0 2px 10px rgba(181, 34, 63, 0.06);
+    }
+
     /* Bench Matcher Tags */
     .skill-matched {
         display: inline-block;
@@ -468,6 +547,21 @@ def style_pie(fig, height=360):
         showlegend=False,
     )
     return fig
+
+def get_status_badge_html(status_val: str) -> str:
+    st_val = (status_val or "Nytt").strip()
+    if st_val == "Granskas":
+        return '<span class="status-pill status-granskas">🔍 Granskas</span>'
+    elif st_val == "Pitch skickad":
+        return '<span class="status-pill status-pitch">✉️ Pitch skickad</span>'
+    elif st_val == "Intervju":
+        return '<span class="status-pill status-intervju">🤝 Intervju</span>'
+    elif st_val in ("Vunnet", "Tillsatt"):
+        return '<span class="status-pill status-vunnet">🏆 Vunnet</span>'
+    elif st_val in ("Avböjt", "Ej aktuell", "Arkiverad"):
+        return '<span class="status-pill status-avböjt">✖ Avböjt</span>'
+    else:
+        return '<span class="status-pill status-nytt">📥 Nytt</span>'
 
 # ----------------- DATABASE INITIALIZATION -----------------
 init_db()
@@ -693,12 +787,92 @@ if current_view == "Marknadsöversikt & Efterfrågan":
 
 # ----------------- VIEW 2: UPPDRAG & LEAD PIPELINE -----------------
 elif current_view == "Uppdrag & Lead Pipeline":
-    st.markdown("##### Marknadsförfrågningar och uppdragsflöde")
-    st.caption("Sök och filtrera bland regionens aktiva uppdrag. Generera skräddarsydda konsultpitchar med ett klick.")
+    st.markdown("##### Säljpipeline & Uppdragsflöde (Lead Pipeline CRM)")
+    st.caption("Aktiv uppföljning och statusstyrning för regionala affärsmöjligheter från identifiering till tillsatt uppdrag.")
 
-    col_search, col_skill_filter, col_limit = st.columns([3, 2, 1])
+    pipe_kpis = get_pipeline_kpis(db, location=selected_location)
+
+    # 1. Pipeline Funnel Summary Bar
+    col_pk1, col_pk2, col_pk3, col_pk4, col_pk5, col_pk6 = st.columns(6)
+    with col_pk1:
+        st.markdown(
+            f"""
+            <div class="funnel-metric-card">
+                <div style="font-size:0.68rem;font-weight:700;color:#64748b;text-transform:uppercase;">1. Nya Leads</div>
+                <div style="font-size:1.45rem;font-weight:800;color:inherit;line-height:1.2;">{pipe_kpis['nytt']}</div>
+                <div style="font-size:0.68rem;opacity:0.6;">Ohanterade</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with col_pk2:
+        st.markdown(
+            f"""
+            <div class="funnel-metric-card" style="border-color: rgba(245,158,11,0.3);">
+                <div style="font-size:0.68rem;font-weight:700;color:#d97706;text-transform:uppercase;">2. Granskas</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#d97706;line-height:1.2;">{pipe_kpis['granskas']}</div>
+                <div style="font-size:0.68rem;opacity:0.6;">Matchning pågår</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with col_pk3:
+        st.markdown(
+            f"""
+            <div class="funnel-metric-card" style="border-color: rgba(181,34,63,0.3);">
+                <div style="font-size:0.68rem;font-weight:700;color:#B5223F;text-transform:uppercase;">3. Pitch skickad</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#B5223F;line-height:1.2;">{pipe_kpis['pitch']}</div>
+                <div style="font-size:0.68rem;opacity:0.6;">Konsult presenterad</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with col_pk4:
+        st.markdown(
+            f"""
+            <div class="funnel-metric-card" style="border-color: rgba(99,102,241,0.3);">
+                <div style="font-size:0.68rem;font-weight:700;color:#6366f1;text-transform:uppercase;">4. Intervju</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#6366f1;line-height:1.2;">{pipe_kpis['intervju']}</div>
+                <div style="font-size:0.68rem;opacity:0.6;">Kundmöte bokat</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with col_pk5:
+        st.markdown(
+            f"""
+            <div class="funnel-metric-card" style="border-color: rgba(16,185,129,0.3);">
+                <div style="font-size:0.68rem;font-weight:700;color:#059669;text-transform:uppercase;">5. Vunnet</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#059669;line-height:1.2;">{pipe_kpis['vunnet']}</div>
+                <div style="font-size:0.68rem;opacity:0.6;">Tillsatt uppdrag</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with col_pk6:
+        st.markdown(
+            f"""
+            <div class="funnel-metric-card">
+                <div style="font-size:0.68rem;font-weight:700;color:#94a3b8;text-transform:uppercase;">Avböjt</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#94a3b8;line-height:1.2;">{pipe_kpis['avböjt']}</div>
+                <div style="font-size:0.68rem;opacity:0.6;">Arkiverade</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+
+    # 2. Filter & Controls
+    col_search, col_status_filter, col_skill_filter, col_limit = st.columns([2.5, 1.8, 1.8, 1])
     with col_search:
-        search_query = st.text_input("Sök i uppdragsbeskrivningar", "", placeholder="Sök roll, teknik eller bolagsnamn...")
+        search_query = st.text_input("Sök i pipeline & uppdrag", "", placeholder="Sök roll, teknik, bolag, konsult...")
+    with col_status_filter:
+        pipeline_status_filter = st.selectbox(
+            "Pipeline-status",
+            ["Alla", "Nytt", "Granskas", "Pitch skickad", "Intervju", "Vunnet", "Avböjt"],
+            index=0,
+        )
     with col_skill_filter:
         skills_in_db = [s.name for s in db.query(Skill).order_by(Skill.name).all()]
         selected_skill = st.selectbox("Filtrera på kompetens", ["Alla"] + skills_in_db)
@@ -711,79 +885,159 @@ elif current_view == "Uppdrag & Lead Pipeline":
         location=selected_location,
         source=selected_source,
         selected_skill=selected_skill,
+        status=pipeline_status_filter if pipeline_status_filter != "Alla" else None,
         limit=max_leads,
     )
 
     if leads_list:
         leads_df = pd.DataFrame(leads_list)
         csv_data = leads_df.drop(columns=["description"]).to_csv(index=False).encode("utf-8")
-        
+
         col_count, col_download = st.columns([4, 1])
         with col_count:
-            st.caption(f"Visar {len(leads_list)} matchande uppdrag i urvalet.")
+            st.caption(f"Visar {len(leads_list)} matchande affärsmöjligheter i pipelinen.")
         with col_download:
             st.download_button(
-                label="Exportera data (.csv)",
+                label="Exportera pipeline (.csv)",
                 data=csv_data,
-                file_name=f"lead_intelligence_{datetime.now().strftime('%Y%m%d')}.csv",
+                file_name=f"consid_lead_pipeline_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
                 use_container_width=True,
             )
+    else:
+        st.info("Inga uppdrag matchar ditt valda filter just nu.")
+
+    STATUS_ORDER = ["Nytt", "Granskas", "Pitch skickad", "Intervju", "Vunnet", "Avböjt"]
 
     for lead in leads_list:
         source_class = "source-consultant" if lead["is_consultant"] else "source-recruitment"
-        source_text = "Konsult" if lead["is_consultant"] else "Rekrytering"
-        
+        source_text = "Konsultuppdrag" if lead["is_consultant"] else "Rekryteringsannons"
+        status_html = get_status_badge_html(lead["status"])
+
         skill_tags = "".join([f'<span class="skill-tag">{s}</span>' for s in lead["skills"]])
-        
+
         link_html = (
-            f'<a href="{lead["url"]}" target="_blank" class="link-action">Visa fullständig annons →</a>'
+            f'<a href="{lead["url"]}" target="_blank" class="link-action">Visa källannons →</a>'
             if lead["url"]
             else '<span style="opacity:0.6; font-size:0.8rem;">Länk saknas</span>'
         )
 
+        crm_meta_items = []
+        if lead["assigned_to"]:
+            crm_meta_items.append(f'<span>Ansvarig: <span class="pipeline-assignee">👤 {lead["assigned_to"]}</span></span>')
+        if lead["candidate_name"]:
+            crm_meta_items.append(f'<span>Föreslagen konsult: <strong style="color:#B5223F;">⭐ {lead["candidate_name"]}</strong></span>')
+        crm_meta_html = " • ".join(crm_meta_items) if crm_meta_items else ""
+
+        notes_html = f'<div class="pipeline-notes-box"><strong>Intern säljnotering:</strong> {lead["notes"]}</div>' if lead["notes"] else ""
+
         st.markdown(
             f"""
             <div class="lead-row">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px;">
-                    <div class="lead-title-text">{lead['title']}</div>
-                    <div><span class="tag-source {source_class}">{source_text}</span></div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                            {status_html}
+                            <span class="tag-source {source_class}">{source_text}</span>
+                        </div>
+                        <div class="lead-title-text">{lead['title']}</div>
+                    </div>
+                    <div>{link_html}</div>
                 </div>
                 <div class="lead-attributes">
-                    <span>Organisation: <span class="lead-attr-strong">{lead['company_name']}</span></span>
+                    <span>Beställare: <span class="lead-attr-strong">{lead['company_name']}</span></span>
                     <span>Ort: <span class="lead-attr-strong">{lead['location']}</span></span>
                     <span>Publicerad: {lead['published_at']}</span>
                     <span>Deadline: {lead['deadline']}</span>
                 </div>
+                {f'<div style="margin-bottom: 8px; font-size: 0.82rem;">{crm_meta_html}</div>' if crm_meta_html else ''}
                 <div style="margin-bottom: 10px;">{skill_tags}</div>
-                <div style="opacity: 0.8; font-size: 0.85rem; line-height: 1.5; margin-bottom: 12px;">
-                    {lead['description'][:260] + '...' if lead['description'] else 'Detaljerad information finns i källsystemet.'}
+                <div style="opacity: 0.8; font-size: 0.85rem; line-height: 1.5; margin-bottom: 10px;">
+                    {lead['description'][:240] + '...' if lead['description'] else 'Detaljerad information finns i källsystemet.'}
                 </div>
-                <div>{link_html}</div>
+                {notes_html}
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        with st.expander(f"Skapa konsultpitch & säljmejl ({lead['company_name']})"):
-            col_p1, col_p2 = st.columns([3, 2])
-            with col_p1:
-                default_profile = f"Senior specialist inom {', '.join(lead['skills'][:3]) if lead['skills'] else 'systemutveckling'}"
+        # Action Hub: Pipeline Management & Sales Pitch
+        col_act1, col_act2 = st.columns([1, 1])
+
+        with col_act1:
+            with st.expander(f"🎯 Uppdatera Pipeline & Status ({lead['company_name']})"):
+                cur_idx = STATUS_ORDER.index(lead["status"]) if lead["status"] in STATUS_ORDER else 0
+                new_status = st.selectbox(
+                    "Ny pipeline-status",
+                    STATUS_ORDER,
+                    index=cur_idx,
+                    key=f"pipe_status_{lead['id']}",
+                )
+
+                col_cm1, col_cm2 = st.columns(2)
+                with col_cm1:
+                    new_assignee = st.text_input(
+                        "Ansvarig konsultchef/säljare",
+                        value=lead["assigned_to"],
+                        key=f"pipe_ass_{lead['id']}",
+                        placeholder="T.ex. Erik S / Konsultchef Öst",
+                    )
+                with col_cm2:
+                    new_candidate = st.text_input(
+                        "Matchad konsult / kandidat",
+                        value=lead["candidate_name"],
+                        key=f"pipe_cand_{lead['id']}",
+                        placeholder="T.ex. Anna A (Senior Fullstack)",
+                    )
+
+                new_notes = st.text_area(
+                    "Säljanteckningar & kunddialog",
+                    value=lead["notes"],
+                    key=f"pipe_notes_{lead['id']}",
+                    height=85,
+                    placeholder="T.ex. Kontaktat kund via LinkedIn. Söker 1 senior konsult, intervjuer nästa tisdag...",
+                )
+
+                if st.button("Spara pipeline-ändringar", key=f"btn_save_pipe_{lead['id']}", use_container_width=True):
+                    update_lead_status(
+                        db,
+                        lead_id=lead["id"],
+                        status=new_status,
+                        assigned_to=new_assignee,
+                        candidate_name=new_candidate,
+                        notes=new_notes,
+                    )
+                    st.toast("Pipeline sparad!")
+                    st.rerun()
+
+        with col_act2:
+            with st.expander(f"✉️ Skapa & Kopiera Säljpitch ({lead['company_name']})"):
+                c_role_def = f"Senior specialist inom {', '.join(lead['skills'][:3]) if lead['skills'] else 'systemutveckling'}"
                 c_role = st.text_input(
-                    "Konsultprofil / Erfarenhetsinriktning",
-                    value=default_profile,
+                    "Konsultens profil",
+                    value=lead["candidate_name"] if lead["candidate_name"] else c_role_def,
                     key=f"role_{lead['id']}",
                 )
-            with col_p2:
                 c_avail = st.text_input(
                     "Tillgänglig från",
                     value="inom 2–4 veckor",
                     key=f"avail_{lead['id']}",
                 )
 
-            pitch = generate_sales_pitch(lead, consultant_profile=c_role, available_from=c_avail)
-            st.text_input("Föreslagen ämnesrad", value=pitch["subject"], key=f"subj_{lead['id']}")
-            st.text_area("Färdigt säljmejl (redigerbart)", value=pitch["body"], height=190, key=f"body_{lead['id']}")
+                pitch = generate_sales_pitch(lead, consultant_profile=c_role, available_from=c_avail)
+                st.text_input("Ämnesrad", value=pitch["subject"], key=f"subj_{lead['id']}")
+                st.text_area("Säljmejl", value=pitch["body"], height=130, key=f"body_{lead['id']}")
+
+                if st.button("Markera som 'Pitch skickad' direkt", key=f"btn_fast_pitch_{lead['id']}", use_container_width=True):
+                    update_lead_status(
+                        db,
+                        lead_id=lead["id"],
+                        status="Pitch skickad",
+                        candidate_name=c_role,
+                        notes=f"Säljpitch genererad & skickad: {pitch['subject']}",
+                    )
+                    st.toast(f"Uppdraget flyttat till 'Pitch skickad' för {c_role}!")
+                    st.rerun()
 
 # ----------------- VIEW 3: KONSULTMATCHNING & BÄNKOPTIMERING -----------------
 elif current_view == "Konsultmatchning & Bänkoptimering":
@@ -918,12 +1172,14 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
                 else '<span style="opacity:0.6; font-size:0.8rem;">Länk saknas</span>'
             )
 
+            status_badge = get_status_badge_html(lead.get("status", "Nytt"))
+
             st.markdown(
                 f"""
                 <div class="lead-row">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
                         <div>
-                            {score_pill} {source_tag}
+                            {score_pill} {source_tag} {status_badge}
                             <div class="lead-title-text" style="margin-top: 6px;">{lead['title']}</div>
                         </div>
                         <div>
@@ -934,6 +1190,8 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
                         <span>Beställare: <span class="lead-attr-strong">{lead['company']}</span></span>
                         <span>Ort: <span class="lead-attr-strong">{lead['location']}</span></span>
                         <span>Publicerad: <span>{lead['published_at']}</span></span>
+                        {f'<span>Kandidat: <span class="lead-attr-strong">{lead["candidate_name"]}</span></span>' if lead.get("candidate_name") else ''}
+                        {f'<span>Ansvarig: <span class="lead-attr-strong">{lead["assigned_to"]}</span></span>' if lead.get("assigned_to") else ''}
                     </div>
                     <div style="margin-top: 8px; font-size: 0.8rem;">
                         <div style="margin-bottom: 4px;"><strong>Matchade krav:</strong> {matched_tags if matched_tags else '<span style=\"opacity:0.6;\">Inga direkta teknikkrav</span>'}</div>
@@ -948,10 +1206,22 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
             with st.expander(f"Generera säljpitch för {active_consultant['name']} till {lead['company']}"):
                 col_sp1, col_sp2 = st.columns([3, 1])
                 with col_sp1:
-                    st.text_input("Föreslagen ämnesrad", value=lead["pitch_subject"], key=f"pitch_sub_{lead['lead_id']}_{active_consultant['name']}")
+                    custom_sub = st.text_input("Föreslagen ämnesrad", value=lead["pitch_subject"], key=f"pitch_sub_{lead['lead_id']}_{active_consultant['name']}")
                 with col_sp2:
                     st.caption("Färdigt att kopiera & skicka")
-                st.text_area("Säljmejl (redigerbart)", value=lead["pitch_body"], height=190, key=f"pitch_body_{lead['lead_id']}_{active_consultant['name']}")
+                custom_body = st.text_area("Säljmejl (redigerbart)", value=lead["pitch_body"], height=190, key=f"pitch_body_{lead['lead_id']}_{active_consultant['name']}")
+
+                if st.button(f"🚀 Spara pitch & flytta till 'Pitch skickad'", key=f"pipe_save_{lead['lead_id']}_{active_consultant['name']}", use_container_width=True):
+                    update_lead_status(
+                        db,
+                        lead_id=lead["lead_id"],
+                        status="Pitch skickad",
+                        assigned_to=active_consultant.get("location", "Konsultchef"),
+                        candidate_name=active_consultant["name"],
+                        notes=f"Matchad med {active_consultant['name']} ({lead['match_score']}% match).\nÄmne: {custom_sub}",
+                    )
+                    st.toast(f"Uppdraget har sparats och flyttats till Säljpipeline som 'Pitch skickad' för {active_consultant['name']}!")
+                    st.rerun()
     else:
         st.info("Inga uppdrag nådde den valda lägsta matchningsgraden. Prova att sänka matchningströskeln ovan.")
 

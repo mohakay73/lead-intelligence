@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional, Any
+from datetime import datetime
 import pandas as pd
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -168,15 +169,89 @@ def get_top_employers(
     return pd.DataFrame(results, columns=["company", "location", "count"])
 
 
+def get_pipeline_kpis(db: Session, location: Optional[str] = None) -> Dict[str, int]:
+    """Calculates lead counts across each stage of the consulting sales pipeline."""
+    query = db.query(Lead).filter(Lead.source != "historical")
+    if location and location != "Alla":
+        query = query.filter(Lead.location.ilike(f"%{location}%"))
+
+    leads = query.all()
+    kpis = {
+        "total": len(leads),
+        "nytt": 0,
+        "granskas": 0,
+        "pitch": 0,
+        "intervju": 0,
+        "vunnet": 0,
+        "avböjt": 0,
+    }
+    for l in leads:
+        st = (getattr(l, "status", None) or "Nytt").strip()
+        if st == "Nytt":
+            kpis["nytt"] += 1
+        elif st == "Granskas":
+            kpis["granskas"] += 1
+        elif st == "Pitch skickad":
+            kpis["pitch"] += 1
+        elif st == "Intervju":
+            kpis["intervju"] += 1
+        elif st in ("Vunnet", "Tillsatt"):
+            kpis["vunnet"] += 1
+        elif st in ("Avböjt", "Ej aktuell", "Arkiverad"):
+            kpis["avböjt"] += 1
+        else:
+            kpis["nytt"] += 1
+    return kpis
+
+
+def update_lead_status(
+    db: Session,
+    lead_id: int,
+    status: str,
+    assigned_to: Optional[str] = None,
+    candidate_name: Optional[str] = None,
+    notes: Optional[str] = None,
+) -> bool:
+    """Updates pipeline stage, assignee, matched candidate and sales notes for a lead."""
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        return False
+
+    lead.status = status
+    if assigned_to is not None:
+        lead.assigned_to = assigned_to.strip() if assigned_to else None
+    if candidate_name is not None:
+        lead.candidate_name = candidate_name.strip() if candidate_name else None
+    if notes is not None:
+        lead.notes = notes.strip() if notes else None
+    lead.status_updated_at = datetime.utcnow()
+
+    db.commit()
+    return True
+
+
+def get_all_assignees(db: Session) -> List[str]:
+    """Returns list of unique assignees in pipeline."""
+    res = (
+        db.query(func.distinct(Lead.assigned_to))
+        .filter(Lead.assigned_to.isnot(None), Lead.assigned_to != "")
+        .order_by(Lead.assigned_to.asc())
+        .all()
+    )
+    return [r[0] for r in res if r[0]]
+
+
 def get_filtered_leads(
     db: Session,
     search_term: Optional[str] = None,
     location: Optional[str] = None,
     source: Optional[str] = None,
     selected_skill: Optional[str] = None,
+    status: Optional[str] = None,
+    assigned_to: Optional[str] = None,
     limit: int = 50,
 ) -> List[Dict[str, Any]]:
-    """Returns detailed lead cards for the Lead Explorer view."""
+    """Returns detailed lead cards for the Lead Explorer & Pipeline views."""
     query = db.query(Lead)
 
     if location and location != "Alla":
@@ -187,9 +262,24 @@ def get_filtered_leads(
     else:
         query = query.filter(Lead.source != "historical")
 
+    if status and status != "Alla":
+        if status == "Nytt":
+            query = query.filter((Lead.status == "Nytt") | (Lead.status == None))
+        else:
+            query = query.filter(Lead.status == status)
+
+    if assigned_to and assigned_to != "Alla":
+        query = query.filter(Lead.assigned_to == assigned_to)
+
     if search_term:
         term = f"%{search_term}%"
-        query = query.filter((Lead.title.ilike(term)) | (Lead.description.ilike(term)) | (Lead.company_name.ilike(term)))
+        query = query.filter(
+            (Lead.title.ilike(term))
+            | (Lead.description.ilike(term))
+            | (Lead.company_name.ilike(term))
+            | (Lead.candidate_name.ilike(term))
+            | (Lead.notes.ilike(term))
+        )
 
     if selected_skill and selected_skill != "Alla":
         query = query.join(lead_skills).join(Skill).filter(Skill.name == selected_skill)
@@ -210,5 +300,10 @@ def get_filtered_leads(
             "is_consultant": l.is_consultant_assignment,
             "skills": [s.name for s in l.skills],
             "description": l.description,
+            "status": getattr(l, "status", None) or "Nytt",
+            "assigned_to": getattr(l, "assigned_to", None) or "",
+            "candidate_name": getattr(l, "candidate_name", None) or "",
+            "notes": getattr(l, "notes", None) or "",
+            "status_updated_at": l.status_updated_at.strftime("%Y-%m-%d %H:%M") if getattr(l, "status_updated_at", None) else None,
         })
     return output
