@@ -13,15 +13,6 @@ load_dotenv(BASE_DIR / ".env", override=True)
 
 from database.connection import init_db, SessionLocal
 from database.models import Skill, Lead
-import importlib
-import analytics.trend_engine
-import analytics.historical_analytics
-import analytics.feature_pipeline
-import analytics.forecast_engine
-importlib.reload(analytics.trend_engine)
-importlib.reload(analytics.historical_analytics)
-importlib.reload(analytics.feature_pipeline)
-importlib.reload(analytics.forecast_engine)
 from analytics.trend_engine import (
     get_overview_kpis,
     get_skill_demand,
@@ -569,9 +560,117 @@ def render_html(html_str: str):
     clean = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
     st.markdown(clean, unsafe_allow_html=True)
 
-# ----------------- DATABASE INITIALIZATION -----------------
-init_db()
+# ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
+@st.cache_resource(show_spinner=False)
+def setup_database():
+    init_db()
+    return True
+
+setup_database()
 db = SessionLocal()
+
+# ----------------- HIGH-PERFORMANCE DATA CACHING -----------------
+@st.cache_data(ttl=180, show_spinner=False)
+def cached_overview_kpis():
+    with SessionLocal() as s:
+        return get_overview_kpis(s)
+
+@st.cache_data(ttl=180, show_spinner=False)
+def cached_skill_demand(location, source, top_n=12):
+    with SessionLocal() as s:
+        return get_skill_demand(s, location=location, source=source, top_n=top_n)
+
+@st.cache_data(ttl=180, show_spinner=False)
+def cached_top_employers(location, source, limit=12):
+    with SessionLocal() as s:
+        return get_top_employers(s, location=location, source=source, limit=limit)
+
+@st.cache_data(ttl=180, show_spinner=False)
+def cached_location_distribution(source):
+    with SessionLocal() as s:
+        return get_location_distribution(s, source=source)
+
+@st.cache_data(ttl=180, show_spinner=False)
+def cached_category_distribution(location, source):
+    with SessionLocal() as s:
+        return get_category_distribution(s, location=location, source=source)
+
+@st.cache_data(ttl=120, show_spinner=False)
+def cached_pipeline_kpis(location):
+    with SessionLocal() as s:
+        return get_pipeline_kpis(s, location=location)
+
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_skills_list():
+    with SessionLocal() as s:
+        return [r[0] for r in s.query(Skill.name).order_by(Skill.name).all() if r[0]]
+
+@st.cache_data(ttl=120, show_spinner=False)
+def cached_assignees_list():
+    with SessionLocal() as s:
+        return get_all_assignees(s)
+
+@st.cache_data(ttl=60, show_spinner=False)
+def cached_filtered_leads(search_term, location, source, selected_skill, status, assigned_to, limit):
+    with SessionLocal() as s:
+        return get_filtered_leads(
+            s,
+            search_term=search_term,
+            location=location,
+            source=source,
+            selected_skill=selected_skill,
+            status=status,
+            assigned_to=assigned_to,
+            limit=limit,
+        )
+
+@st.cache_data(ttl=180, show_spinner=False)
+def cached_consultant_matches(consultant_name, consultant_title, consultant_location, consultant_skills_tuple, clearance, location_filter, min_match_pct, limit=25):
+    with SessionLocal() as s:
+        consultant_dict = {
+            "name": consultant_name,
+            "title": consultant_title,
+            "location": consultant_location,
+            "skills": list(consultant_skills_tuple),
+            "clearance": clearance,
+        }
+        return match_consultant_to_leads(
+            s,
+            consultant=consultant_dict,
+            location_filter=location_filter,
+            min_match_pct=min_match_pct,
+            limit=limit,
+        )
+
+@st.cache_data(ttl=600, show_spinner=False)
+def cached_forecast_display_data(location):
+    with SessionLocal() as s:
+        return get_forecast_display_data(s, location=location)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def cached_monthly_volume_trend(location):
+    with SessionLocal() as s:
+        return get_monthly_volume_trend(s, location=location)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def cached_seasonal_pattern(location):
+    with SessionLocal() as s:
+        return get_seasonal_pattern(s, location=location)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def cached_top_skills_time_series(location):
+    with SessionLocal() as s:
+        return get_top_skills_time_series(s, location=location, top_n=6)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def cached_skill_growth_barometer(location):
+    with SessionLocal() as s:
+        return get_skill_growth_barometer(s, location=location)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def cached_weekly_digest(days_back=7):
+    with SessionLocal() as s:
+        return build_weekly_intelligence_data(s, days_back=days_back)
 
 # ----------------- NAVIGATION & WORKSPACES -----------------
 FUNCTION_VIEWS = [
@@ -635,6 +734,7 @@ if st.sidebar.button("Synkronisera data nu", use_container_width=True):
             st.sidebar.success(
                 f"Klar. Nya poster: {stats['new_leads_saved']}, Uppdaterade: {stats['existing_leads_updated']}"
             )
+            st.cache_data.clear()
             st.rerun()
         except Exception as e:
             st.sidebar.error(f"Synkroniseringsfel: {e}")
@@ -679,7 +779,7 @@ render_html(
 
 # ----------------- VIEW 1: MARKNADSÖVERSIKT & EFTERFRÅGAN -----------------
 if current_view == "Marknadsöversikt & Efterfrågan":
-    kpis = get_overview_kpis(db)
+    kpis = cached_overview_kpis()
 
     # Macro KPI Grid
     render_html(
@@ -714,7 +814,7 @@ if current_view == "Marknadsöversikt & Efterfrågan":
     with col_skills:
         loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
         st.markdown(f"###### Mest efterfrågade kompetenser ({loc_label})")
-        skill_df = get_skill_demand(db, location=selected_location, source=selected_source, top_n=12)
+        skill_df = cached_skill_demand(location=selected_location, source=selected_source, top_n=12)
         if not skill_df.empty:
             fig_skills = px.bar(
                 skill_df,
@@ -734,7 +834,7 @@ if current_view == "Marknadsöversikt & Efterfrågan":
     with col_emp:
         loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
         st.markdown(f"###### Mest aktiva uppdragsgivare ({loc_label})")
-        top_emp_df = get_top_employers(db, location=selected_location, source=selected_source, limit=12)
+        top_emp_df = cached_top_employers(location=selected_location, source=selected_source, limit=12)
         if not top_emp_df.empty:
             fig_emp = px.bar(
                 top_emp_df,
@@ -757,7 +857,7 @@ if current_view == "Marknadsöversikt & Efterfrågan":
     col_geo, col_cat = st.columns(2)
     with col_geo:
         st.markdown("###### Geografisk fördelning av uppdrag")
-        loc_df = get_location_distribution(db, source=selected_source)
+        loc_df = cached_location_distribution(source=selected_source)
         if not loc_df.empty:
             fig_loc = px.pie(
                 loc_df,
@@ -774,7 +874,7 @@ if current_view == "Marknadsöversikt & Efterfrågan":
 
     with col_cat:
         st.markdown("###### Fördelning per tekniskt område")
-        cat_df = get_category_distribution(db, location=selected_location, source=selected_source)
+        cat_df = cached_category_distribution(location=selected_location, source=selected_source)
         if not cat_df.empty:
             fig_cat = px.pie(
                 cat_df,
@@ -794,7 +894,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
     st.markdown("##### Säljpipeline & Uppdragsflöde (Lead Pipeline CRM)")
     st.caption("Aktiv uppföljning och statusstyrning för regionala affärsmöjligheter från identifiering till tillsatt uppdrag.")
 
-    pipe_kpis = get_pipeline_kpis(db, location=selected_location)
+    pipe_kpis = cached_pipeline_kpis(location=selected_location)
 
     # 1. Pipeline Funnel Summary Bar
     col_pk1, col_pk2, col_pk3, col_pk4, col_pk5, col_pk6 = st.columns(6)
@@ -872,18 +972,18 @@ elif current_view == "Uppdrag & Lead Pipeline":
             index=0,
         )
     with col_skill_filter:
-        skills_in_db = [s.name for s in db.query(Skill).order_by(Skill.name).all()]
+        skills_in_db = cached_skills_list()
         selected_skill = st.selectbox("Filtrera på kompetens", ["Alla"] + skills_in_db)
     with col_limit:
         max_leads = st.selectbox("Max antal", [25, 50, 100], index=1)
 
-    leads_list = get_filtered_leads(
-        db,
+    leads_list = cached_filtered_leads(
         search_term=search_query,
         location=selected_location,
         source=selected_source,
         selected_skill=selected_skill,
         status=pipeline_status_filter if pipeline_status_filter != "Alla" else None,
+        assigned_to=None,
         limit=max_leads,
     )
 
@@ -1005,6 +1105,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
                         notes=new_notes,
                     )
                     st.toast("Pipeline sparad!")
+                    st.cache_data.clear()
                     st.rerun()
 
         with col_act2:
@@ -1034,6 +1135,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
                         notes=f"Säljpitch genererad & skickad: {pitch['subject']}",
                     )
                     st.toast(f"Uppdraget flyttat till 'Pitch skickad' för {c_role}!")
+                    st.cache_data.clear()
                     st.rerun()
 
 # ----------------- VIEW 3: KONSULTMATCHNING & BÄNKOPTIMERING -----------------
@@ -1098,7 +1200,7 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
         )
 
         detected_custom_skills = [s[0] for s in extract_skills_from_text(raw_cv_text)] if raw_cv_text else []
-        all_skills = [s.name for s in db.query(Skill).order_by(Skill.name).all()]
+        all_skills = cached_skills_list()
         
         custom_selected_skills = st.multiselect(
             "Kompetenser (extraherade automatiskt ur texten, justera vid behov)",
@@ -1117,9 +1219,12 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
             "summary": raw_cv_text[:300] if raw_cv_text else f"{c_role_input} baserad i {c_loc_input}.",
         }
 
-    matched_leads = match_consultant_to_leads(
-        db,
-        consultant=active_consultant,
+    matched_leads = cached_consultant_matches(
+        consultant_name=active_consultant["name"],
+        consultant_title=active_consultant["title"],
+        consultant_location=active_consultant["location"],
+        consultant_skills_tuple=tuple(active_consultant["skills"]),
+        clearance=active_consultant.get("clearance", False),
         location_filter=selected_location if selected_location != "Alla" else None,
         min_match_pct=min_score,
         limit=25,
@@ -1218,6 +1323,7 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
                         notes=f"Matchad med {active_consultant['name']} ({lead['match_score']}% match).\nÄmne: {custom_sub}",
                     )
                     st.toast(f"Uppdraget har sparats och flyttats till Säljpipeline som 'Pitch skickad' för {active_consultant['name']}!")
+                    st.cache_data.clear()
                     st.rerun()
     else:
         st.info("Inga uppdrag nådde den valda lägsta matchningsgraden. Prova att sänka matchningströskeln ovan.")
@@ -1234,7 +1340,7 @@ elif current_view == "Marknadsprognos & Trender":
         st.markdown("##### Prediktiv Efterfrågeprognos (6 Månader Framåt)")
         st.caption("Maskininlärningsprognos (Holt-Winters säsongsextrapolering & momentum) tränad på 58 månaders data (2022–2026) sparad i Supabase.")
 
-        hist_df, fc_df, trending_skills = get_forecast_display_data(db, location=selected_location)
+        hist_df, fc_df, trending_skills = cached_forecast_display_data(selected_location)
 
         if not fc_df.empty:
             avg_fc_vol = fc_df["predicted_volume"].mean()
@@ -1361,6 +1467,7 @@ elif current_view == "Marknadsprognos & Trender":
                     with st.spinner("Tränar om tidsserie- och momentummodeller..."):
                         run_forecast_and_save(db, location=selected_location)
                         st.success("Modell omtränad och prognos uppdaterad!")
+                        st.cache_data.clear()
                         st.rerun()
             with col_btn_info:
                 st.caption("Modellen tränas automatiskt varannan vecka via GitHub Actions. Klicka ovan för att framtvinga en omedelbar omräkning.")
@@ -1369,6 +1476,7 @@ elif current_view == "Marknadsprognos & Trender":
             if st.button("Generera prognos nu"):
                 with st.spinner("Tränar modell..."):
                     run_forecast_and_save(db, location=selected_location)
+                    st.cache_data.clear()
                     st.rerun()
 
     with tab_history:
@@ -1381,7 +1489,7 @@ elif current_view == "Marknadsprognos & Trender":
             loc_label = selected_location if selected_location != "Alla" else "Hela regionen"
             st.markdown(f"###### Volymtrend månad för månad ({loc_label})")
             try:
-                vol_df = get_monthly_volume_trend(db, location=selected_location)
+                vol_df = cached_monthly_volume_trend(selected_location)
                 if not vol_df.empty:
                     fig_vol = px.line(
                         vol_df,
@@ -1401,7 +1509,7 @@ elif current_view == "Marknadsprognos & Trender":
         with col_t2:
             st.markdown("###### Säsongsmönster: När rekryterar kunderna som mest?")
             try:
-                season_df = get_seasonal_pattern(db, location=selected_location)
+                season_df = cached_seasonal_pattern(selected_location)
                 if not season_df.empty:
                     fig_season = px.bar(
                         season_df,
@@ -1426,7 +1534,7 @@ elif current_view == "Marknadsprognos & Trender":
         with col_t3:
             st.markdown("###### Kompetensutveckling över tid: Topp 6 teknologier")
             try:
-                skills_ts_df = get_top_skills_time_series(db, location=selected_location, top_n=6)
+                skills_ts_df = cached_top_skills_time_series(selected_location)
                 if not skills_ts_df.empty:
                     fig_ts = px.line(
                         skills_ts_df,
@@ -1447,7 +1555,7 @@ elif current_view == "Marknadsprognos & Trender":
         with col_t4:
             st.markdown("###### Tillväxtbarometer: Snabbast växande kompetenser (%)")
             try:
-                growth_df = get_skill_growth_barometer(db, location=selected_location)
+                growth_df = cached_skill_growth_barometer(selected_location)
                 if not growth_df.empty:
                     fig_growth = px.bar(
                         growth_df,
@@ -1564,7 +1672,7 @@ elif current_view == "Ledningsrapport & Veckobrev":
     st.markdown("##### Veckorapport: Marknadsintelligens för ledningen")
     st.caption("Aggregerad sammanställning av den senaste veckans uppdragsflöde, heta leads och kompetenstrender.")
 
-    digest_data = build_weekly_intelligence_data(db, days_back=7)
+    digest_data = cached_weekly_digest(days_back=7)
     digest_md = format_markdown_digest(digest_data)
     digest_html = format_html_digest(digest_data)
 

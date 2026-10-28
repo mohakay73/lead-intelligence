@@ -170,14 +170,19 @@ def get_top_employers(
 
 
 def get_pipeline_kpis(db: Session, location: Optional[str] = None) -> Dict[str, int]:
-    """Calculates lead counts across each stage of the consulting sales pipeline."""
-    query = db.query(Lead).filter(Lead.source != "historical")
+    """Calculates lead counts across each stage of the consulting sales pipeline using fast SQL aggregation."""
+    status_col = func.coalesce(Lead.status, "Nytt")
+    query = (
+        db.query(status_col, func.count(Lead.id))
+        .filter(Lead.source != "historical")
+    )
     if location and location != "Alla":
         query = query.filter(Lead.location.ilike(f"%{location}%"))
 
-    leads = query.all()
+    results = query.group_by(status_col).all()
+
     kpis = {
-        "total": len(leads),
+        "total": 0,
         "nytt": 0,
         "granskas": 0,
         "pitch": 0,
@@ -185,22 +190,23 @@ def get_pipeline_kpis(db: Session, location: Optional[str] = None) -> Dict[str, 
         "vunnet": 0,
         "avböjt": 0,
     }
-    for l in leads:
-        st = (getattr(l, "status", None) or "Nytt").strip()
+    for st_val, count in results:
+        st = (st_val or "Nytt").strip()
+        kpis["total"] += count
         if st == "Nytt":
-            kpis["nytt"] += 1
+            kpis["nytt"] += count
         elif st == "Granskas":
-            kpis["granskas"] += 1
+            kpis["granskas"] += count
         elif st == "Pitch skickad":
-            kpis["pitch"] += 1
+            kpis["pitch"] += count
         elif st == "Intervju":
-            kpis["intervju"] += 1
+            kpis["intervju"] += count
         elif st in ("Vunnet", "Tillsatt"):
-            kpis["vunnet"] += 1
+            kpis["vunnet"] += count
         elif st in ("Avböjt", "Ej aktuell", "Arkiverad"):
-            kpis["avböjt"] += 1
+            kpis["avböjt"] += count
         else:
-            kpis["nytt"] += 1
+            kpis["nytt"] += count
     return kpis
 
 

@@ -67,7 +67,7 @@ class Lead(Base):
         UniqueConstraint("source", "external_id", name="uq_source_external_id"),
     )
 
-    skills = relationship("Skill", secondary=lead_skills, back_populates="leads")
+    skills = relationship("Skill", secondary=lead_skills, back_populates="leads", lazy="selectin")
 
     def __repr__(self):
         return f"<Lead {self.title} at {self.company_name} ({self.source})>"
