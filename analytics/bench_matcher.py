@@ -97,7 +97,14 @@ def match_consultant_to_leads(
     if location_filter and location_filter != "Alla":
         query = query.filter(Lead.location.ilike(f"%{location_filter}%"))
 
-    active_leads = query.all()
+    try:
+        active_leads = query.all()
+    except Exception:
+        db.rollback()
+        fb_q = db.query(Lead).filter(Lead.source != "historical")
+        if location_filter and location_filter != "Alla":
+            fb_q = fb_q.filter(Lead.location.ilike(f"%{location_filter}%"))
+        active_leads = fb_q.all()
     matches = []
 
     for lead in active_leads:

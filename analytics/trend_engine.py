@@ -186,7 +186,18 @@ def get_pipeline_kpis(
     if location and location != "Alla":
         query = query.filter(Lead.location.ilike(f"%{location}%"))
 
-    results = query.group_by(status_col).all()
+    try:
+        results = query.group_by(status_col).all()
+    except Exception:
+        db.rollback()
+        # Fallback if column migration is propagating
+        fb_query = (
+            db.query(status_col, func.count(Lead.id))
+            .filter(Lead.source != "historical")
+        )
+        if location and location != "Alla":
+            fb_query = fb_query.filter(Lead.location.ilike(f"%{location}%"))
+        results = fb_query.group_by(status_col).all()
 
     kpis = {
         "total": 0,
@@ -301,7 +312,16 @@ def get_filtered_leads(
     if selected_skill and selected_skill != "Alla":
         query = query.join(lead_skills).join(Skill).filter(Skill.name == selected_skill)
 
-    leads = query.order_by(Lead.published_at.desc().nullslast(), Lead.id.desc()).limit(limit).all()
+    try:
+        leads = query.order_by(Lead.published_at.desc().nullslast(), Lead.id.desc()).limit(limit).all()
+    except Exception:
+        db.rollback()
+        fb_query = db.query(Lead).filter(Lead.source != "historical")
+        if location and location != "Alla":
+            fb_query = fb_query.filter(Lead.location.ilike(f"%{location}%"))
+        if source and source != "Alla":
+            fb_query = fb_query.filter(Lead.source == source)
+        leads = fb_query.order_by(Lead.published_at.desc().nullslast(), Lead.id.desc()).limit(limit).all()
 
     output = []
     for l in leads:

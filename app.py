@@ -562,11 +562,12 @@ def render_html(html_str: str):
 
 # ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
 @st.cache_resource(show_spinner=False)
-def setup_database():
+def setup_database(schema_version: int = 5):
     init_db()
     return True
 
-setup_database()
+setup_database(schema_version=5)
+init_db()
 db = SessionLocal()
 
 # ----------------- HIGH-PERFORMANCE DATA CACHING -----------------
