@@ -10,6 +10,56 @@ from ingestion.normalizer import extract_skills_from_text
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("IngestionPipeline")
 
+RECRUITMENT_AGENCY_PATTERNS = [
+    "academic work",
+    "randstad",
+    "adecco",
+    "manpower",
+    "experis",
+    "bravura",
+    "studentconsulting",
+    "student consulting",
+    "framtiden",
+    "poolia",
+    "clockwork",
+    "tng ",
+    "tng group",
+    "jefferson wells",
+    "dedicare",
+    "sjr ",
+    "michael page",
+    "page personnel",
+    "hays",
+    "ants tech",
+    "wise it",
+    "wise professional",
+    "worko",
+    "centric",
+    "hero rekrytering",
+    "maxkompetens",
+    "onepartnergroup",
+    "lernia",
+    "perido",
+    "clevry",
+    "wrknest",
+    "bemannia",
+    "uniflex",
+    "montico",
+    "wikan personal",
+    "skill scandinavia",
+    "skill ab",
+    "skill rekrytering",
+]
+
+def is_recruitment_agency_company(company_name: str | None) -> bool:
+    """Detects if employer is a staffing or recruitment agency."""
+    if not company_name:
+        return False
+    c_lower = company_name.strip().lower()
+    if c_lower == "skill":
+        return True
+    return any(p in c_lower for p in RECRUITMENT_AGENCY_PATTERNS)
+
 
 def run_pipeline() -> Dict[str, Any]:
     """
@@ -82,6 +132,7 @@ def run_pipeline() -> Dict[str, Any]:
             lead.is_consultant_assignment = raw.get(
                 "is_consultant_assignment", lead.is_consultant_assignment
             )
+            lead.is_recruitment_agency = is_recruitment_agency_company(lead.company_name)
             lead.published_at = raw.get("published_at", lead.published_at)
             lead.deadline = raw.get("deadline", lead.deadline)
 

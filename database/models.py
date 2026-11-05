@@ -61,6 +61,7 @@ class Lead(Base):
     candidate_name = Column(String(150), nullable=True)
     notes = Column(Text, nullable=True)
     status_updated_at = Column(DateTime, nullable=True)
+    is_recruitment_agency = Column(Boolean, default=False, index=True)
 
     # Unique constraint per external source ID
     __table_args__ = (

@@ -169,13 +169,20 @@ def get_top_employers(
     return pd.DataFrame(results, columns=["company", "location", "count"])
 
 
-def get_pipeline_kpis(db: Session, location: Optional[str] = None) -> Dict[str, int]:
+def get_pipeline_kpis(
+    db: Session,
+    location: Optional[str] = None,
+    hide_recruiters: bool = True,
+) -> Dict[str, int]:
     """Calculates lead counts across each stage of the consulting sales pipeline using fast SQL aggregation."""
     status_col = func.coalesce(Lead.status, "Nytt")
     query = (
         db.query(status_col, func.count(Lead.id))
         .filter(Lead.source != "historical")
     )
+    if hide_recruiters:
+        query = query.filter((Lead.is_recruitment_agency == False) | (Lead.is_recruitment_agency == None))
+
     if location and location != "Alla":
         query = query.filter(Lead.location.ilike(f"%{location}%"))
 
@@ -255,10 +262,14 @@ def get_filtered_leads(
     selected_skill: Optional[str] = None,
     status: Optional[str] = None,
     assigned_to: Optional[str] = None,
+    hide_recruiters: bool = True,
     limit: int = 50,
 ) -> List[Dict[str, Any]]:
     """Returns detailed lead cards for the Lead Explorer & Pipeline views."""
     query = db.query(Lead)
+
+    if hide_recruiters:
+        query = query.filter((Lead.is_recruitment_agency == False) | (Lead.is_recruitment_agency == None))
 
     if location and location != "Alla":
         query = query.filter(Lead.location.ilike(f"%{location}%"))
@@ -310,6 +321,7 @@ def get_filtered_leads(
             "assigned_to": getattr(l, "assigned_to", None) or "",
             "candidate_name": getattr(l, "candidate_name", None) or "",
             "notes": getattr(l, "notes", None) or "",
+            "is_recruiter": getattr(l, "is_recruitment_agency", False),
             "status_updated_at": l.status_updated_at.strftime("%Y-%m-%d %H:%M") if getattr(l, "status_updated_at", None) else None,
         })
     return output

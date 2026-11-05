@@ -33,6 +33,53 @@ def init_db():
                 conn.execute(text("ALTER TABLE leads ADD COLUMN IF NOT EXISTS candidate_name VARCHAR(150);"))
                 conn.execute(text("ALTER TABLE leads ADD COLUMN IF NOT EXISTS notes TEXT;"))
                 conn.execute(text("ALTER TABLE leads ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMP;"))
+                conn.execute(text("ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_recruitment_agency BOOLEAN DEFAULT FALSE;"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_leads_is_recruitment_agency ON leads(is_recruitment_agency);"))
+
+                # Backfill existing leads from recruitment and staffing agencies
+                conn.execute(text("""
+                    UPDATE leads 
+                    SET is_recruitment_agency = TRUE 
+                    WHERE is_recruitment_agency IS NOT TRUE AND (
+                        company_name ILIKE '%academic work%' OR
+                        company_name ILIKE '%randstad%' OR
+                        company_name ILIKE '%adecco%' OR
+                        company_name ILIKE '%manpower%' OR
+                        company_name ILIKE '%experis%' OR
+                        company_name ILIKE '%bravura%' OR
+                        company_name ILIKE '%studentconsulting%' OR
+                        company_name ILIKE '%student consulting%' OR
+                        company_name ILIKE '%framtiden%' OR
+                        company_name ILIKE '%poolia%' OR
+                        company_name ILIKE '%clockwork%' OR
+                        company_name ILIKE '%tng %' OR company_name ILIKE '%tng group%' OR
+                        company_name ILIKE '%jefferson wells%' OR
+                        company_name ILIKE '%dedicare%' OR
+                        company_name ILIKE '%sjr %' OR
+                        company_name ILIKE '%michael page%' OR
+                        company_name ILIKE '%page personnel%' OR
+                        company_name ILIKE '%hays%' OR
+                        company_name ILIKE '%ants tech%' OR
+                        company_name ILIKE '%wise it%' OR company_name ILIKE '%wise professional%' OR
+                        company_name ILIKE '%worko%' OR
+                        company_name ILIKE '%centric%' OR
+                        company_name ILIKE '%hero rekrytering%' OR
+                        company_name ILIKE '%maxkompetens%' OR
+                        company_name ILIKE '%onepartnergroup%' OR
+                        company_name ILIKE '%lernia%' OR
+                        company_name ILIKE '%perido%' OR
+                        company_name ILIKE '%clevry%' OR
+                        company_name ILIKE '%wrknest%' OR
+                        company_name ILIKE '%bemannia%' OR
+                        company_name ILIKE '%uniflex%' OR
+                        company_name ILIKE '%montico%' OR
+                        company_name ILIKE '%wikan personal%' OR
+                        company_name ILIKE '%skill scandinavia%' OR
+                        company_name ILIKE '%skill ab%' OR
+                        company_name ILIKE '%skill rekrytering%' OR
+                        LOWER(TRIM(company_name)) = 'skill'
+                    );
+                """))
                 conn.commit()
         except Exception:
             pass

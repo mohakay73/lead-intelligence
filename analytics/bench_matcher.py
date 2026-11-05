@@ -75,6 +75,7 @@ def match_consultant_to_leads(
     consultant: Dict[str, Any],
     location_filter: Optional[str] = None,
     min_match_pct: int = 30,
+    hide_recruiters: bool = True,
     limit: int = 20,
 ) -> List[Dict[str, Any]]:
     """
@@ -89,6 +90,9 @@ def match_consultant_to_leads(
 
     # Fetch active leads only (Lead.source != "historical")
     query = db.query(Lead).filter(Lead.source != "historical")
+
+    if hide_recruiters:
+        query = query.filter((Lead.is_recruitment_agency == False) | (Lead.is_recruitment_agency == None))
 
     if location_filter and location_filter != "Alla":
         query = query.filter(Lead.location.ilike(f"%{location_filter}%"))

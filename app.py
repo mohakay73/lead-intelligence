@@ -596,9 +596,9 @@ def cached_category_distribution(location, source):
         return get_category_distribution(s, location=location, source=source)
 
 @st.cache_data(ttl=120, show_spinner=False)
-def cached_pipeline_kpis(location):
+def cached_pipeline_kpis(location, hide_recruiters=True):
     with SessionLocal() as s:
-        return get_pipeline_kpis(s, location=location)
+        return get_pipeline_kpis(s, location=location, hide_recruiters=hide_recruiters)
 
 @st.cache_data(ttl=300, show_spinner=False)
 def cached_skills_list():
@@ -611,7 +611,7 @@ def cached_assignees_list():
         return get_all_assignees(s)
 
 @st.cache_data(ttl=60, show_spinner=False)
-def cached_filtered_leads(search_term, location, source, selected_skill, status, assigned_to, limit):
+def cached_filtered_leads(search_term, location, source, selected_skill, status, assigned_to, hide_recruiters, limit):
     with SessionLocal() as s:
         return get_filtered_leads(
             s,
@@ -621,11 +621,12 @@ def cached_filtered_leads(search_term, location, source, selected_skill, status,
             selected_skill=selected_skill,
             status=status,
             assigned_to=assigned_to,
+            hide_recruiters=hide_recruiters,
             limit=limit,
         )
 
 @st.cache_data(ttl=180, show_spinner=False)
-def cached_consultant_matches(consultant_name, consultant_title, consultant_location, consultant_skills_tuple, clearance, location_filter, min_match_pct, limit=25):
+def cached_consultant_matches(consultant_name, consultant_title, consultant_location, consultant_skills_tuple, clearance, location_filter, min_match_pct, hide_recruiters=True, limit=25):
     with SessionLocal() as s:
         consultant_dict = {
             "name": consultant_name,
@@ -639,6 +640,7 @@ def cached_consultant_matches(consultant_name, consultant_title, consultant_loca
             consultant=consultant_dict,
             location_filter=location_filter,
             min_match_pct=min_match_pct,
+            hide_recruiters=hide_recruiters,
             limit=limit,
         )
 
@@ -891,10 +893,19 @@ if current_view == "Marknadsöversikt & Efterfrågan":
 
 # ----------------- VIEW 2: UPPDRAG & LEAD PIPELINE -----------------
 elif current_view == "Uppdrag & Lead Pipeline":
-    st.markdown("##### Säljpipeline & Uppdragsflöde (Lead Pipeline CRM)")
-    st.caption("Aktiv uppföljning och statusstyrning för regionala affärsmöjligheter från identifiering till tillsatt uppdrag.")
+    col_head_title, col_rec_toggle = st.columns([3, 2])
+    with col_head_title:
+        st.markdown("##### Säljpipeline & Uppdragsflöde (Lead Pipeline CRM)")
+        st.caption("Aktiv uppföljning och statusstyrning för regionala affärsmöjligheter från identifiering till tillsatt uppdrag.")
+    with col_rec_toggle:
+        include_recruiters = st.checkbox(
+            "Inkludera rekryteringsbolag",
+            value=False,
+            help="Som standard döljs bemannings- och rekryteringsföretag (t.ex. Academic Work, Randstad) så att ni enbart ser direkta slutkunder och konsultuppdrag.",
+        )
+    hide_recruiters = not include_recruiters
 
-    pipe_kpis = cached_pipeline_kpis(location=selected_location)
+    pipe_kpis = cached_pipeline_kpis(location=selected_location, hide_recruiters=hide_recruiters)
 
     # 1. Pipeline Funnel Summary Bar
     col_pk1, col_pk2, col_pk3, col_pk4, col_pk5, col_pk6 = st.columns(6)
@@ -984,6 +995,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
         selected_skill=selected_skill,
         status=pipeline_status_filter if pipeline_status_filter != "Alla" else None,
         assigned_to=None,
+        hide_recruiters=hide_recruiters,
         limit=max_leads,
     )
 
@@ -1010,6 +1022,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
     for lead in leads_list:
         source_class = "source-consultant" if lead["is_consultant"] else "source-recruitment"
         source_text = "Konsultuppdrag" if lead["is_consultant"] else "Rekryteringsannons"
+        recruiter_tag = '<span class="tag-source" style="background:rgba(239, 68, 68, 0.12);color:#dc2626;border:1px solid rgba(239, 68, 68, 0.35);font-size:0.7rem;">⚠️ Rekryteringsbolag</span>' if lead.get("is_recruiter") else ""
         status_html = get_status_badge_html(lead["status"])
 
         skill_tags = "".join([f'<span class="skill-tag">{html.escape(s)}</span>' for s in lead["skills"]])
@@ -1037,6 +1050,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
                         {status_html}
                         <span class="tag-source {source_class}">{source_text}</span>
+                        {recruiter_tag}
                     </div>
                     <div class="lead-title-text">{html.escape(lead['title'])}</div>
                 </div>
@@ -1227,6 +1241,7 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
         clearance=active_consultant.get("clearance", False),
         location_filter=selected_location if selected_location != "Alla" else None,
         min_match_pct=min_score,
+        hide_recruiters=True,
         limit=25,
     )
 
