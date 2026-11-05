@@ -746,8 +746,8 @@ st.sidebar.markdown(
     """
     <div style="background: rgba(181, 34, 63, 0.04); border: 1px solid rgba(181, 34, 63, 0.16); border-radius: 8px; padding: 12px; margin-top: 14px; font-size: 0.75rem; opacity: 0.85; color: inherit; line-height: 1.5;">
         <div style="font-weight: 700; color: #B5223F; margin-bottom: 4px;">Automatiserad drift (GitHub Actions)</div>
-        • Daglig synkning: Vardagar kl. 06:20 CET<br>
-        • Veckorapport (Teams): Måndagar kl. 06:45 CET<br>
+        • Datainsamling: Sön kl. 21:00 & vardagar kl. 05:15 CET<br>
+        • Veckorapport (Teams): Måndagar kl. 04:30 CET (klar till morgonen)<br>
         • ML-modellträning: 1:a & 15:e i månaden
     </div>
     """,
