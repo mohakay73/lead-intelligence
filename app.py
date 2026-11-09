@@ -1720,7 +1720,8 @@ elif current_view == "Ledningsrapport & Veckobrev":
             use_container_width=True,
         )
 
-    current_env_webhook = os.getenv("TEAMS_WEBHOOK_URL", "").strip()
+    from config import get_secret
+    current_env_webhook = get_secret("TEAMS_WEBHOOK_URL", "").strip()
 
     with col_btn_teams:
         if st.button("Skicka rapport till Microsoft Teams nu", use_container_width=True):

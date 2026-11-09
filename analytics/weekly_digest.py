@@ -226,6 +226,12 @@ def send_teams_notification(markdown_content: str, webhook_url: Optional[str] = 
 
     url = webhook_url or os.getenv("TEAMS_WEBHOOK_URL") or os.getenv("SLACK_WEBHOOK_URL")
     if not url:
+        try:
+            import streamlit as st
+            url = st.secrets.get("TEAMS_WEBHOOK_URL", "") or st.secrets.get("SLACK_WEBHOOK_URL", "")
+        except Exception:
+            pass
+    if not url:
         return False
 
     headers = {"Content-Type": "application/json"}
