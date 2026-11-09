@@ -23,6 +23,7 @@ from analytics.trend_engine import (
     get_pipeline_kpis,
     update_lead_status,
     get_all_assignees,
+    auto_archive_expired_leads,
 )
 from analytics.pitch_generator import generate_sales_pitch
 from analytics.weekly_digest import (
@@ -550,7 +551,9 @@ def get_status_badge_html(status_val: str) -> str:
         return '<span class="status-pill status-intervju">🤝 Intervju</span>'
     elif st_val in ("Vunnet", "Tillsatt"):
         return '<span class="status-pill status-vunnet">🏆 Vunnet</span>'
-    elif st_val in ("Avböjt", "Ej aktuell", "Arkiverad"):
+    elif st_val == "Arkiverad":
+        return '<span class="status-pill" style="background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;">📁 Arkiverad</span>'
+    elif st_val in ("Avböjt", "Ej aktuell"):
         return '<span class="status-pill status-avböjt">✖ Avböjt</span>'
     else:
         return '<span class="status-pill status-nytt">📥 Nytt</span>'
@@ -562,12 +565,16 @@ def render_html(html_str: str):
 
 # ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
 @st.cache_resource(show_spinner=False)
-def setup_database(schema_version: int = 6):
+def setup_database(schema_version: int = 7):
     init_db()
+    with SessionLocal() as s:
+        auto_archive_expired_leads(s)
     return True
 
-setup_database(schema_version=6)
+setup_database(schema_version=7)
 init_db()
+with SessionLocal() as s:
+    auto_archive_expired_leads(s)
 db = SessionLocal()
 
 # ----------------- HIGH-PERFORMANCE DATA CACHING -----------------
@@ -812,6 +819,16 @@ if current_view == "Marknadsöversikt & Efterfrågan":
         """
     )
 
+    if kpis.get("archived_leads", 0) > 0:
+        st.markdown(
+            f"""
+            <div style="font-size:0.75rem; color:#64748b; margin-top:8px; margin-bottom:18px;">
+                📁 <b>Automatisk livscykelhantering:</b> <b>{kpis['archived_leads']}</b> utgångna eller avslutade uppdrag är arkiverade. De räknas bort från aktiva behov men bevaras i databasen för historik och AI-trendanalys.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     # Row 1: Competencies (left) & Top Employers (right) - Balanced Bar Charts
     col_skills, col_emp = st.columns(2)
     with col_skills:
@@ -964,9 +981,9 @@ elif current_view == "Uppdrag & Lead Pipeline":
         render_html(
             f"""
             <div class="funnel-metric-card">
-                <div style="font-size:0.68rem;font-weight:700;color:#94a3b8;text-transform:uppercase;">Avböjt</div>
+                <div style="font-size:0.68rem;font-weight:700;color:#94a3b8;text-transform:uppercase;">Arkiv / Avböjt</div>
                 <div style="font-size:1.45rem;font-weight:800;color:#94a3b8;line-height:1.2;">{pipe_kpis['avböjt']}</div>
-                <div style="font-size:0.68rem;opacity:0.6;">Arkiverade</div>
+                <div style="font-size:0.68rem;opacity:0.6;">Avslutade & Arkiverade</div>
             </div>
             """
         )
@@ -980,7 +997,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
     with col_status_filter:
         pipeline_status_filter = st.selectbox(
             "Pipeline-status",
-            ["Alla", "Nytt", "Granskas", "Pitch skickad", "Intervju", "Vunnet", "Avböjt"],
+            ["Aktiva uppdrag", "Alla", "Nytt", "Granskas", "Pitch skickad", "Intervju", "Vunnet", "Avböjt", "Arkiverad"],
             index=0,
         )
     with col_skill_filter:
@@ -994,7 +1011,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
         location=selected_location,
         source=selected_source,
         selected_skill=selected_skill,
-        status=pipeline_status_filter if pipeline_status_filter != "Alla" else None,
+        status=pipeline_status_filter,
         assigned_to=None,
         hide_recruiters=hide_recruiters,
         limit=max_leads,
@@ -1018,7 +1035,7 @@ elif current_view == "Uppdrag & Lead Pipeline":
     else:
         st.info("Inga uppdrag matchar ditt valda filter just nu.")
 
-    STATUS_ORDER = ["Nytt", "Granskas", "Pitch skickad", "Intervju", "Vunnet", "Avböjt"]
+    STATUS_ORDER = ["Nytt", "Granskas", "Pitch skickad", "Intervju", "Vunnet", "Avböjt", "Arkiverad"]
 
     for lead in leads_list:
         source_class = "source-consultant" if lead["is_consultant"] else "source-recruitment"

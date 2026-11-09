@@ -3,6 +3,7 @@ from typing import Dict, Any
 from config import DATABASE_URL
 from database.connection import init_db, SessionLocal
 from database.models import Lead, Skill
+from analytics.trend_engine import auto_archive_expired_leads
 from ingestion.jobtech_client import JobTechClient
 from ingestion.brainville_client import BrainvilleClient
 from ingestion.normalizer import extract_skills_from_text
@@ -154,6 +155,12 @@ def run_pipeline() -> Dict[str, Any]:
                 stats["skills_mapped"] += 1
 
         db.commit()
+
+        # Auto-archive expired and stale leads (Alternativ 2)
+        archived_count = auto_archive_expired_leads(db)
+        stats["expired_archived"] = archived_count
+        logger.info(f"Auto-archived {archived_count} expired/stale leads.")
+
         logger.info(f"Pipeline completed successfully: {stats}")
         return stats
 

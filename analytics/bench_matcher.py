@@ -88,8 +88,12 @@ def match_consultant_to_leads(
     c_avail = consultant.get("available_from", "inom 2–4 veckor")
     c_clearance = consultant.get("clearance", False)
 
-    # Fetch active leads only (Lead.source != "historical")
-    query = db.query(Lead).filter(Lead.source != "historical")
+    # Fetch active leads only (Lead.source != "historical" and not archived/rejected)
+    query = (
+        db.query(Lead)
+        .filter(Lead.source != "historical")
+        .filter((Lead.status == None) | (~Lead.status.in_(["Arkiverad", "Avböjt"])))
+    )
 
     if hide_recruiters:
         query = query.filter((Lead.is_recruitment_agency == False) | (Lead.is_recruitment_agency == None))
@@ -101,7 +105,11 @@ def match_consultant_to_leads(
         active_leads = query.all()
     except Exception:
         db.rollback()
-        fb_q = db.query(Lead).filter(Lead.source != "historical")
+        fb_q = (
+            db.query(Lead)
+            .filter(Lead.source != "historical")
+            .filter((Lead.status == None) | (~Lead.status.in_(["Arkiverad", "Avböjt"])))
+        )
         if location_filter and location_filter != "Alla":
             fb_q = fb_q.filter(Lead.location.ilike(f"%{location_filter}%"))
         active_leads = fb_q.all()

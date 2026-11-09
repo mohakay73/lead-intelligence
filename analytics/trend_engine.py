@@ -1,24 +1,83 @@
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from database.models import Lead, Skill, lead_skills
 
 
+def auto_archive_expired_leads(
+    db: Session,
+    deadline_grace_days: int = 7,
+    stale_published_days: int = 45,
+) -> int:
+    """
+    Automatically archives expired and stale unworked leads.
+    - If deadline has passed by more than deadline_grace_days (default 7 days).
+    - Or if deadline is missing and the posting is older than stale_published_days (default 45 days).
+    - STRICT PROTECTION: Never touches active sales pipeline leads ('Granskas', 'Pitch skickad', 'Intervju', 'Vunnet').
+      Only targets unhandled leads ('Nytt' or empty/None).
+    """
+    now = datetime.utcnow()
+    deadline_cutoff = now - timedelta(days=deadline_grace_days)
+    published_cutoff = now - timedelta(days=stale_published_days)
+
+    unworked_condition = (Lead.status == None) | (Lead.status == "Nytt") | (Lead.status == "")
+
+    expired_condition = (
+        (Lead.deadline.isnot(None) & (Lead.deadline < deadline_cutoff))
+        | (Lead.deadline.is_(None) & Lead.published_at.isnot(None) & (Lead.published_at < published_cutoff))
+    )
+
+    try:
+        leads_to_archive = (
+            db.query(Lead)
+            .filter(Lead.source != "historical")
+            .filter(unworked_condition)
+            .filter(expired_condition)
+            .all()
+        )
+        archived_count = len(leads_to_archive)
+        if archived_count > 0:
+            for l in leads_to_archive:
+                l.status = "Arkiverad"
+                l.status_updated_at = now
+            db.commit()
+        return archived_count
+    except Exception:
+        db.rollback()
+        return 0
+
+
 def get_overview_kpis(db: Session) -> Dict[str, Any]:
-    """Calculates top-level executive metrics for active opportunities."""
-    total_leads = db.query(func.count(Lead.id)).filter(Lead.source != "historical").scalar() or 0
+    """Calculates top-level executive metrics for active opportunities (excluding archived/rejected)."""
+    active_filter = (
+        (Lead.source != "historical")
+        & ((Lead.status == None) | (~Lead.status.in_(["Arkiverad", "Avböjt"])))
+    )
+
+    total_leads = db.query(func.count(Lead.id)).filter(active_filter).scalar() or 0
     consultant_leads = (
         db.query(func.count(Lead.id))
-        .filter(Lead.is_consultant_assignment == True, Lead.source != "historical")
+        .filter(Lead.is_consultant_assignment == True, active_filter)
         .scalar()
         or 0
     )
-    jobtech_leads = db.query(func.count(Lead.id)).filter(Lead.source == "jobtech").scalar() or 0
+    jobtech_leads = (
+        db.query(func.count(Lead.id))
+        .filter(Lead.source == "jobtech", active_filter)
+        .scalar()
+        or 0
+    )
     unique_employers = (
         db.query(func.count(func.distinct(Lead.company_name)))
-        .filter(Lead.source != "historical")
+        .filter(active_filter)
+        .scalar()
+        or 0
+    )
+    archived_leads = (
+        db.query(func.count(Lead.id))
+        .filter((Lead.status == "Arkiverad") | (Lead.status == "Avböjt"))
         .scalar()
         or 0
     )
@@ -28,6 +87,7 @@ def get_overview_kpis(db: Session) -> Dict[str, Any]:
         "consultant_leads": consultant_leads,
         "jobtech_leads": jobtech_leads,
         "unique_employers": unique_employers,
+        "archived_leads": archived_leads,
     }
 
 
@@ -56,6 +116,8 @@ def get_skill_demand(
     else:
         query = query.filter(Lead.source != "historical")
 
+    query = query.filter((Lead.status == None) | (~Lead.status.in_(["Arkiverad", "Avböjt"])))
+
     results = (
         query.group_by(Skill.name, Skill.category)
         .order_by(func.count(Lead.id).desc())
@@ -83,6 +145,8 @@ def get_location_distribution(db: Session, source: Optional[str] = None) -> pd.D
         query = query.filter(Lead.source == source)
     else:
         query = query.filter(Lead.source != "historical")
+
+    query = query.filter((Lead.status == None) | (~Lead.status.in_(["Arkiverad", "Avböjt"])))
 
     results = (
         query.group_by(Lead.location)
@@ -120,6 +184,8 @@ def get_category_distribution(
     else:
         query = query.filter(Lead.source != "historical")
 
+    query = query.filter((Lead.status == None) | (~Lead.status.in_(["Arkiverad", "Avböjt"])))
+
     results = (
         query.group_by(Skill.category)
         .order_by(func.count(Lead.id).desc())
@@ -155,6 +221,8 @@ def get_top_employers(
         query = query.filter(Lead.source == source)
     else:
         query = query.filter(Lead.source != "historical")
+
+    query = query.filter((Lead.status == None) | (~Lead.status.in_(["Arkiverad", "Avböjt"])))
 
     results = (
         query.group_by(Lead.company_name, Lead.location)
@@ -207,6 +275,7 @@ def get_pipeline_kpis(
         "intervju": 0,
         "vunnet": 0,
         "avböjt": 0,
+        "arkiverad": 0,
     }
     for st_val, count in results:
         st = (st_val or "Nytt").strip()
@@ -221,7 +290,10 @@ def get_pipeline_kpis(
             kpis["intervju"] += count
         elif st in ("Vunnet", "Tillsatt"):
             kpis["vunnet"] += count
-        elif st in ("Avböjt", "Ej aktuell", "Arkiverad"):
+        elif st == "Arkiverad":
+            kpis["arkiverad"] += count
+            kpis["avböjt"] += count
+        elif st in ("Avböjt", "Ej aktuell"):
             kpis["avböjt"] += count
         else:
             kpis["nytt"] += count
@@ -291,8 +363,14 @@ def get_filtered_leads(
         query = query.filter(Lead.source != "historical")
 
     if status and status != "Alla":
-        if status == "Nytt":
+        if status in ("Aktiva", "Aktiva uppdrag", "Aktiva (exkl. arkiverade)"):
+            query = query.filter((Lead.status == None) | (~Lead.status.in_(["Arkiverad", "Avböjt"])))
+        elif status == "Nytt":
             query = query.filter((Lead.status == "Nytt") | (Lead.status == None))
+        elif status == "Arkiverad":
+            query = query.filter(Lead.status == "Arkiverad")
+        elif status == "Avböjt":
+            query = query.filter(Lead.status.in_(["Avböjt", "Ej aktuell"]))
         else:
             query = query.filter(Lead.status == status)
 
@@ -325,8 +403,14 @@ def get_filtered_leads(
         else:
             fb_query = fb_query.filter(Lead.source != "historical")
         if status and status != "Alla":
-            if status == "Nytt":
+            if status in ("Aktiva", "Aktiva uppdrag", "Aktiva (exkl. arkiverade)"):
+                fb_query = fb_query.filter((Lead.status == None) | (~Lead.status.in_(["Arkiverad", "Avböjt"])))
+            elif status == "Nytt":
                 fb_query = fb_query.filter((Lead.status == "Nytt") | (Lead.status == None))
+            elif status == "Arkiverad":
+                fb_query = fb_query.filter(Lead.status == "Arkiverad")
+            elif status == "Avböjt":
+                fb_query = fb_query.filter(Lead.status.in_(["Avböjt", "Ej aktuell"]))
             else:
                 fb_query = fb_query.filter(Lead.status == status)
         if assigned_to and assigned_to != "Alla":
