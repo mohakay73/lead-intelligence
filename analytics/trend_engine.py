@@ -316,11 +316,32 @@ def get_filtered_leads(
         leads = query.order_by(Lead.published_at.desc().nullslast(), Lead.id.desc()).limit(limit).all()
     except Exception:
         db.rollback()
-        fb_query = db.query(Lead).filter(Lead.source != "historical")
+        # Fallback if is_recruitment_agency column is not yet present
+        fb_query = db.query(Lead)
         if location and location != "Alla":
             fb_query = fb_query.filter(Lead.location.ilike(f"%{location}%"))
         if source and source != "Alla":
             fb_query = fb_query.filter(Lead.source == source)
+        else:
+            fb_query = fb_query.filter(Lead.source != "historical")
+        if status and status != "Alla":
+            if status == "Nytt":
+                fb_query = fb_query.filter((Lead.status == "Nytt") | (Lead.status == None))
+            else:
+                fb_query = fb_query.filter(Lead.status == status)
+        if assigned_to and assigned_to != "Alla":
+            fb_query = fb_query.filter(Lead.assigned_to == assigned_to)
+        if search_term:
+            term = f"%{search_term}%"
+            fb_query = fb_query.filter(
+                (Lead.title.ilike(term))
+                | (Lead.description.ilike(term))
+                | (Lead.company_name.ilike(term))
+                | (Lead.candidate_name.ilike(term))
+                | (Lead.notes.ilike(term))
+            )
+        if selected_skill and selected_skill != "Alla":
+            fb_query = fb_query.join(lead_skills).join(Skill).filter(Skill.name == selected_skill)
         leads = fb_query.order_by(Lead.published_at.desc().nullslast(), Lead.id.desc()).limit(limit).all()
 
     output = []

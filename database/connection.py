@@ -78,13 +78,12 @@ def init_db():
             );
             """
         ]
-        with engine.connect() as conn:
-            for stmt in statements:
-                try:
+        for stmt in statements:
+            try:
+                with engine.begin() as conn:
                     conn.execute(text(stmt))
-                    conn.commit()
-                except Exception:
-                    pass
+            except Exception:
+                pass
 
 
 def get_db():
