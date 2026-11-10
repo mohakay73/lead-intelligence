@@ -2,10 +2,10 @@ name: Scheduled Lead Ingestion
 
 on:
   schedule:
-    # Runs Sunday evening at 20:00 UTC (21:00 CET) to ensure fresh data is ready for the Monday digest
-    - cron: '0 20 * * 0'
-    # Runs weekday mornings at 04:15 UTC (05:15 CET) early before GitHub morning queue delays
-    - cron: '15 4 * * 1-5'
+    # Runs Sunday evening at 20:35 UTC (21:35 CET) to ensure fresh data is ready for the Monday digest
+    - cron: '35 20 * * 0'
+    # Runs weekday nights at 00:35 UTC (01:35 CET) off-peak to bypass daytime queue delays
+    - cron: '35 0 * * 1-5'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
