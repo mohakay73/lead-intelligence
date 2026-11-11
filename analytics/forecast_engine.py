@@ -6,7 +6,7 @@ computes skill momentum trajectories, and persists results to market_forecasts.
 """
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, List, Tuple
 import numpy as np
 import pandas as pd
@@ -128,17 +128,25 @@ def train_and_forecast_volume(
     return forecasts, metrics
 
 
-def compute_skill_momentum_forecast(db: Session, location: str = "Alla") -> List[Dict[str, Any]]:
+def compute_skill_momentum_forecast(
+    db: Session,
+    location: str = "Alla",
+    window_days: int = 180,
+) -> List[Dict[str, Any]]:
     """
     Computes velocity and trajectory of technical skills.
-    Compares recent 6 months with prior period and labels actionable leadership focus.
+    Dynamically compares the recent rolling window (past 6 months / 180 days)
+    against the exact same window one year prior (Year-over-Year / YoY) to eliminate seasonality.
+    Labels actionable leadership focus based on volume and growth momentum.
     """
-    # Period 1: 2025-05 to 2025-10
-    # Period 2: 2026-05 to 2026-10
-    dt_p1_start = datetime(2025, 5, 1)
-    dt_p1_end = datetime(2025, 10, 31, 23, 59, 59)
-    dt_p2_start = datetime(2026, 5, 1)
-    dt_p2_end = datetime(2026, 10, 31, 23, 59, 59)
+    now = datetime.utcnow()
+    # Period 2: Recent rolling 6-month window up to today
+    dt_p2_end = now
+    dt_p2_start = now - timedelta(days=window_days)
+
+    # Period 1: Same rolling 6-month window 1 year prior (YoY baseline)
+    dt_p1_end = dt_p2_end - timedelta(days=365)
+    dt_p1_start = dt_p2_start - timedelta(days=365)
 
     q1 = (
         db.query(Skill.name, Skill.category, func.count(Lead.id).label("count_p1"))
@@ -160,10 +168,14 @@ def compute_skill_momentum_forecast(db: Session, location: str = "Alla") -> List
     df1 = pd.DataFrame(q1.group_by(Skill.name, Skill.category).all(), columns=["skill", "category", "count_p1"])
     df2 = pd.DataFrame(q2.group_by(Skill.name, Skill.category).all(), columns=["skill", "category", "count_p2"])
 
-    if df1.empty or df2.empty:
+    if df2.empty:
         return []
 
-    merged = pd.merge(df1, df2, on=["skill", "category"], how="outer").fillna(0)
+    if df1.empty:
+        merged = df2.copy()
+        merged["count_p1"] = 0
+    else:
+        merged = pd.merge(df1, df2, on=["skill", "category"], how="outer").fillna(0)
     merged = merged[(merged["count_p1"] + merged["count_p2"]) >= 4]  # filter low volume noise
 
     merged["growth_pct"] = np.where(
