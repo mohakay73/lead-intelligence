@@ -1467,11 +1467,18 @@ elif current_view == "Marknadsprognos & Trender":
                     )
                 st.markdown("---")
 
-            # Interactive What-If Simulator Expander
-            last_hist_period = hist_subset["period"].iloc[-1]
-            last_hist_val = hist_subset["total_postings"].iloc[-1]
+            # Prepare historical subset and bridge variables
+            hist_subset = hist_df.tail(18).copy() if not hist_df.empty else pd.DataFrame(columns=["period", "total_postings"])
+            if not hist_subset.empty:
+                last_hist_period = hist_subset["period"].iloc[-1]
+                last_hist_val = hist_subset["total_postings"].iloc[-1]
+            else:
+                last_hist_period = "2026-10"
+                last_hist_val = 200.0
+
             fc_subset = fc_df[fc_df["period"] > last_hist_period].head(6).copy()
 
+            # Interactive What-If Simulator Expander
             sim_rate_delta = 0.0
             sim_ki_delta = 0
             sim_df = pd.DataFrame()
@@ -1526,7 +1533,6 @@ elif current_view == "Marknadsprognos & Trender":
                     )
 
             # Forecast Line Chart with Confidence Interval
-            hist_subset = hist_df.tail(18).copy()
             fig_fc = go.Figure()
 
             # Add Historical Line
