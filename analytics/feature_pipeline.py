@@ -18,6 +18,8 @@ logger = logging.getLogger("FeaturePipeline")
 def extract_monthly_time_series(db: Session, location: str = "Alla") -> pd.DataFrame:
     """
     Extracts chronological monthly posting counts from leads database.
+    Harmonizes historical sampled periods (pre-2026-10) to full market coverage
+    so the longitudinal time-series reflects true market volume without sampling artifacts.
     """
     query = db.query(
         func.to_char(Lead.published_at, "YYYY-MM").label("period"),
@@ -37,7 +39,21 @@ def extract_monthly_time_series(db: Session, location: str = "Alla") -> pd.DataF
         return pd.DataFrame(columns=["period", "total_postings"])
 
     df = pd.DataFrame(results, columns=["period", "total_postings"])
-    df = df[df["period"] >= "2022-01"]
+    df = df[df["period"] >= "2022-01"].copy()
+
+    # Data harmonization: scale pre-October 2026 historical sample to full market coverage
+    if not df.empty:
+        live_mask = df["period"] >= "2026-10"
+        hist_mask = df["period"] < "2026-10"
+        if live_mask.any() and hist_mask.any():
+            live_avg = float(df.loc[live_mask, "total_postings"].mean())
+            hist_avg = float(df.loc[hist_mask, "total_postings"].mean())
+            if hist_avg > 0 and live_avg > hist_avg * 1.4:
+                sample_multiplier = live_avg / hist_avg
+                df.loc[hist_mask, "total_postings"] = (
+                    df.loc[hist_mask, "total_postings"] * sample_multiplier
+                ).round().astype(int)
+
     return df
 
 

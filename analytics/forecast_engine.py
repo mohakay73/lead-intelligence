@@ -93,6 +93,11 @@ def train_and_forecast_volume(
     last_year, last_month = map(int, last_period.split("-"))
     prev_val = float(series[-1])
 
+    # Empirical capacity statistics for mean-reversion dampening and realistic guardrails
+    series_mean = float(np.mean(series[-12:])) if len(series) >= 12 else float(np.mean(series))
+    floor_val = max(10.0, series_mean * 0.45)
+    ceiling_val = max(floor_val * 1.5, series_mean * 1.35)
+
     current_year = last_year
     current_month = last_month
 
@@ -104,12 +109,15 @@ def train_and_forecast_volume(
 
         forecast_period = f"{current_year}-{current_month:02d}"
 
-        pred_val = float(max(5.0, round(p_val, 1)))
+        # Mean-reverting dampening: pulls distant horizon points smoothly towards regional equilibrium
+        decay = 0.85 ** (step + 1)
+        calibrated_p = decay * p_val + (1.0 - decay) * series_mean
+        pred_val = float(round(np.clip(calibrated_p, floor_val, ceiling_val), 1))
 
         # 80% Confidence Interval: ~1.28 * std * sqrt(1 + 0.08 * step)
         step_uncertainty = float(1.28 * residual_std * np.sqrt(1 + 0.08 * step))
-        ci_lower = float(max(2.0, round(pred_val - step_uncertainty, 1)))
-        ci_upper = float(round(pred_val + step_uncertainty, 1))
+        ci_lower = float(round(max(floor_val * 0.80, pred_val - step_uncertainty), 1))
+        ci_upper = float(round(min(ceiling_val * 1.20, pred_val + step_uncertainty), 1))
 
         # Growth MoM
         growth_mom = float(round(((pred_val - prev_val) / prev_val) * 100, 1)) if prev_val > 0 else 0.0
@@ -221,6 +229,10 @@ def run_forecast_and_save(db: Session, location: str = "Alla") -> Dict[str, Any]
     Fits model, generates 6-month forecast and skill momentum,
     and updates market_forecasts table in Supabase.
     """
+    # Harmonize and refresh market features first to guarantee up-to-date inputs
+    from analytics.feature_pipeline import build_and_save_market_features
+    build_and_save_market_features(db, location=location)
+
     feature_df = get_training_features(db, location=location)
     if feature_df.empty or len(feature_df) < 15:
         logger.warning(f"Insufficient feature data for location '{location}'")

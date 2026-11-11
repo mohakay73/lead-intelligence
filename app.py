@@ -565,13 +565,21 @@ def render_html(html_str: str):
 
 # ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
 @st.cache_resource(show_spinner=False)
-def setup_database(schema_version: int = 7):
+def setup_database(schema_version: int = 8):
     init_db()
     with SessionLocal() as s:
         auto_archive_expired_leads(s)
+    try:
+        from analytics.feature_pipeline import run_feature_pipeline
+        from analytics.forecast_engine import run_all_forecasts
+        run_feature_pipeline()
+        run_all_forecasts()
+    except Exception as e:
+        import logging
+        logging.getLogger("DatabaseSetup").warning(f"Feature & forecast pipeline refresh on boot: {e}")
     return True
 
-setup_database(schema_version=7)
+setup_database(schema_version=8)
 init_db()
 with SessionLocal() as s:
     auto_archive_expired_leads(s)

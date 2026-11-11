@@ -32,7 +32,22 @@ def get_monthly_volume_trend(db: Session, location: str = "Alla") -> pd.DataFram
         return pd.DataFrame(columns=["month", "postings"])
 
     df = pd.DataFrame(results, columns=["month", "postings"])
-    return df[df["month"] >= "2022-01"]
+    df = df[df["month"] >= "2022-01"].copy()
+
+    # Data harmonization: scale pre-October 2026 historical sample to full market coverage
+    if not df.empty:
+        live_mask = df["month"] >= "2026-10"
+        hist_mask = df["month"] < "2026-10"
+        if live_mask.any() and hist_mask.any():
+            live_avg = float(df.loc[live_mask, "postings"].mean())
+            hist_avg = float(df.loc[hist_mask, "postings"].mean())
+            if hist_avg > 0 and live_avg > hist_avg * 1.4:
+                sample_multiplier = live_avg / hist_avg
+                df.loc[hist_mask, "postings"] = (
+                    df.loc[hist_mask, "postings"] * sample_multiplier
+                ).round().astype(int)
+
+    return df
 
 
 def get_top_skills_time_series(
