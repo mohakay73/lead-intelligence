@@ -98,6 +98,52 @@ def fetch_live_riksbank_rate() -> Optional[float]:
     return None
 
 
+def fetch_live_ki_confidence() -> Optional[float]:
+    """
+    Attempts to query Konjunkturinstitutet (KI) open API for the latest IT services confidence index.
+    Returns None if offline, sandboxed, or unreachable.
+    """
+    try:
+        url = "https://api.konj.se/api/v1/indicators/computer_programming_consultancy"
+        resp = requests.get(url, timeout=4, headers={"Accept": "application/json"})
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict) and "latest_value" in data:
+                return float(data["latest_value"])
+            elif isinstance(data, list) and len(data) > 0 and "value" in data[-1]:
+                return float(data[-1]["value"])
+    except Exception as e:
+        logger.debug(f"Live KI API query skipped (using calibrated schedule): {e}")
+    return None
+
+
+def fetch_live_regional_layoffs() -> Optional[int]:
+    """
+    Attempts to query official monthly regional layoff notices for Östergötland (05) and Södermanland (04).
+    Returns None if unreachable, sandboxed, or offline.
+    """
+    try:
+        # SCB / Arbetsförmedlingen open statistics query for counties 05 and 04
+        url = "https://api.scb.se/OV0104/v1/doris/sv/ssd/START/AM/AM0202/AM0202A/Varsel01"
+        payload = {
+            "query": [
+                {"code": "Region", "selection": {"filter": "item", "values": ["05", "04"]}},
+            ],
+            "response": {"format": "json"}
+        }
+        resp = requests.post(url, json=payload, timeout=4)
+        if resp.status_code == 200:
+            data = resp.json()
+            if "data" in data and len(data["data"]) > 0:
+                latest_vals = data["data"][-2:]
+                total = sum(int(row["values"][0]) for row in latest_vals if row.get("values"))
+                if total > 0:
+                    return total
+    except Exception as e:
+        logger.debug(f"Live regional layoffs query skipped (using calibrated schedule): {e}")
+    return None
+
+
 def build_macro_dataset() -> List[Dict[str, Any]]:
     """
     Combines Riksbanken policy rate, KI confidence, and regional layoffs
@@ -105,25 +151,32 @@ def build_macro_dataset() -> List[Dict[str, Any]]:
     Computes YoY policy rate change.
     """
     live_rate = fetch_live_riksbank_rate()
+    live_ki = fetch_live_ki_confidence()
+    live_layoffs = fetch_live_regional_layoffs()
+
     records = []
+    current_m = datetime.utcnow().strftime("%Y-%m")
 
     periods = sorted(OFFICIAL_POLICY_RATES.keys())
     for period in periods:
         rate = OFFICIAL_POLICY_RATES[period]
+        ki_val = KI_CONFIDENCE_HISTORY.get(period, 100.0)
+        layoffs = REGIONAL_LAYOFF_HISTORY.get(period, 150)
 
-        # If live Riksbank query succeeded for current period, update it
-        current_m = datetime.utcnow().strftime("%Y-%m")
-        if period == current_m and live_rate is not None:
-            rate = live_rate
+        # If live API queries succeeded for current period, update with live readings
+        if period == current_m:
+            if live_rate is not None:
+                rate = live_rate
+            if live_ki is not None:
+                ki_val = live_ki
+            if live_layoffs is not None:
+                layoffs = live_layoffs
 
         # Compute YoY policy rate change (rate at t minus rate at t-12m)
         y, m = map(int, period.split("-"))
         prev_y_period = f"{y - 1}-{m:02d}"
         prev_rate = OFFICIAL_POLICY_RATES.get(prev_y_period)
         rate_change_yoy = round(rate - prev_rate, 2) if prev_rate is not None else None
-
-        ki_val = KI_CONFIDENCE_HISTORY.get(period, 100.0)
-        layoffs = REGIONAL_LAYOFF_HISTORY.get(period, 150)
 
         records.append({
             "period": period,
