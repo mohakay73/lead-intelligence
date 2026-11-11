@@ -121,3 +121,23 @@ class MarketForecast(Base):
 
     def __repr__(self):
         return f'<MarketForecast {self.forecast_month} - {self.location}: {self.predicted_volume:.1f}>'
+
+
+class MacroIndicator(Base):
+    """
+    Macroeconomic and leading market indicators (Riksbanken, Konjunkturinstitutet, Arbetsförmedlingen).
+    Used as exogenous features to model sensitivity of IT consultant demand to interest rates and business cycles.
+    """
+    __tablename__ = 'macro_indicators'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    period = Column(String(7), nullable=False, unique=True, index=True)  # YYYY-MM
+    policy_rate = Column(Float, nullable=False)  # Riksbankens styrränta i procent (t.ex. 2.75)
+    rate_change_yoy = Column(Float, nullable=True)  # Förändring YoY i procentenheter
+    business_confidence_it = Column(Float, nullable=True)  # KI Konjunkturbarometer IT-tjänster (100 = normal)
+    layoff_notices_region = Column(Integer, nullable=True)  # Arbetsförmedlingen varselstatistik i regionen
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<MacroIndicator {self.period}: Ränta={self.policy_rate}%, KI={self.business_confidence_it}>'

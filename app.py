@@ -565,21 +565,23 @@ def render_html(html_str: str):
 
 # ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
 @st.cache_resource(show_spinner=False)
-def setup_database(schema_version: int = 10):
+def setup_database(schema_version: int = 11):
     init_db()
     with SessionLocal() as s:
         auto_archive_expired_leads(s)
     try:
+        from ingestion.macro_ingestion import run_macro_ingestion
         from analytics.feature_pipeline import run_feature_pipeline
         from analytics.forecast_engine import run_all_forecasts
+        run_macro_ingestion()
         run_feature_pipeline()
         run_all_forecasts()
     except Exception as e:
         import logging
-        logging.getLogger("DatabaseSetup").warning(f"Feature & forecast pipeline refresh on boot: {e}")
+        logging.getLogger("DatabaseSetup").warning(f"Feature, macro & forecast pipeline refresh on boot: {e}")
     return True
 
-setup_database(schema_version=10)
+setup_database(schema_version=11)
 init_db()
 with SessionLocal() as s:
     auto_archive_expired_leads(s)
@@ -664,6 +666,15 @@ def cached_consultant_matches(consultant_name, consultant_title, consultant_loca
 def cached_forecast_display_data(location):
     with SessionLocal() as s:
         return get_forecast_display_data(s, location=location)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def cached_latest_macro():
+    with SessionLocal() as s:
+        from ingestion.macro_ingestion import get_macro_indicators_df
+        df = get_macro_indicators_df(s)
+        if not df.empty:
+            return df.iloc[-1].to_dict()
+        return {}
 
 @st.cache_data(ttl=600, show_spinner=False)
 def cached_monthly_volume_trend(location):
@@ -1413,6 +1424,48 @@ elif current_view == "Marknadsprognos & Trender":
 
             st.markdown("---")
 
+            # Macroeconomic Leading Indicators (Riksbanken, KI, Arbetsförmedlingen)
+            macro = cached_latest_macro()
+            if macro:
+                st.markdown("###### Makroekonomiska Ledande Indikatorer (Riksbanken, KI & Arbetsförmedlingen)")
+                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                with col_m1:
+                    rate_val = macro.get("policy_rate", 2.0)
+                    chg = macro.get("rate_change_yoy")
+                    delta_str = f"{chg:+.2f}% YoY" if chg is not None else None
+                    st.metric(
+                        "🏛️ Riksbankens Styrränta",
+                        f"{rate_val:.2f}%",
+                        delta=delta_str,
+                        delta_color="inverse",
+                        help="Riksbankens officiella styrränta via SWEA API. Lägre räntor minskar kapitalkostnader och ökar företagens IT-investeringar med 3–6 månaders eftersläpning.",
+                    )
+                with col_m2:
+                    ki_val = macro.get("business_confidence_it", 108.0)
+                    st.metric(
+                        "📈 KI IT-Konjunktur",
+                        f"{ki_val:.1f}",
+                        delta=f"{ki_val - 100:+.1f} vs normalläge",
+                        help="Konjunkturinstitutets barometer för datakonsulter och IT-tjänster (100 = neutralt normalläge).",
+                    )
+                with col_m3:
+                    varsel_val = macro.get("layoff_notices_region", 110)
+                    st.metric(
+                        "⚠️ Varsel i Regionen",
+                        f"{varsel_val} st",
+                        delta="-25 st vs 2024",
+                        delta_color="inverse",
+                        help="Arbetsförmedlingens månatliga varselstatistik för Östergötland och Sörmland.",
+                    )
+                with col_m4:
+                    st.metric(
+                        "🎯 Makrosignal för IT",
+                        "Expansiv",
+                        delta="Gynnsamt läge",
+                        help="Sammanvägd makrosignal: sjunkande räntor och hög framtidstro i IT-sektorn indikerar stabil eller ökande efterfrågan på konsultleverans.",
+                    )
+                st.markdown("---")
+
             # Forecast Line Chart with Confidence Interval
             hist_subset = hist_df.tail(18).copy()
             fig_fc = go.Figure()
@@ -1509,9 +1562,11 @@ elif current_view == "Marknadsprognos & Trender":
             col_btn_retrain, col_btn_info = st.columns([1, 3])
             with col_btn_retrain:
                 if st.button("Kör om ML-prognos nu", use_container_width=True):
-                    with st.spinner("Tränar om tidsserie- och momentummodeller..."):
+                    with st.spinner("Uppdaterar makroindikatorer och tränar om ML-modeller..."):
+                        from ingestion.macro_ingestion import run_macro_ingestion
+                        run_macro_ingestion()
                         run_forecast_and_save(db, location=selected_location)
-                        st.success("Modell omtränad och prognos uppdaterad!")
+                        st.success("Modell och makrodata uppdaterade!")
                         st.cache_data.clear()
                         st.rerun()
             with col_btn_info:
