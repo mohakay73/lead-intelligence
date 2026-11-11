@@ -3,6 +3,7 @@ Historical Market Trend & Forecasting Analytics.
 Analyzes long-term trends, skill growth trajectories, and seasonal patterns
 across Östergötland, Södertälje & Nyköping (2022 - present).
 """
+from datetime import datetime
 from typing import Dict, Any, List
 import pandas as pd
 from sqlalchemy import func, extract, literal_column
@@ -33,6 +34,11 @@ def get_monthly_volume_trend(db: Session, location: str = "Alla") -> pd.DataFram
 
     df = pd.DataFrame(results, columns=["month", "postings"])
     df = df[df["month"] >= "2022-01"].copy()
+
+    # Filter out current in-progress month so partial month data does not show an artificial cliff
+    current_period = datetime.utcnow().strftime("%Y-%m")
+    if not df.empty and df.iloc[-1]["month"] == current_period:
+        df = df.iloc[:-1].copy()
 
     # Data harmonization: scale pre-October 2026 historical sample to full market coverage
     if not df.empty:

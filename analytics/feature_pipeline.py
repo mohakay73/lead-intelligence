@@ -5,6 +5,7 @@ and tracks skill momentum over time. Persists features into Supabase (market_fea
 """
 import json
 import logging
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 import pandas as pd
 from sqlalchemy import func, literal_column
@@ -40,6 +41,12 @@ def extract_monthly_time_series(db: Session, location: str = "Alla") -> pd.DataF
 
     df = pd.DataFrame(results, columns=["period", "total_postings"])
     df = df[df["period"] >= "2022-01"].copy()
+
+    # Filter out current in-progress month (e.g. today's month with partial days)
+    # to avoid right-censored partial data showing an artificial drop or biasing model baseline.
+    current_period = datetime.utcnow().strftime("%Y-%m")
+    if not df.empty and df.iloc[-1]["period"] == current_period:
+        df = df.iloc[:-1].copy()
 
     # Data harmonization: scale pre-October 2026 historical sample to full market coverage
     if not df.empty:
@@ -118,7 +125,14 @@ def build_and_save_market_features(db: Session, location: str = "Alla") -> int:
     # 4. Monthly skill distribution
     skill_dist = compute_skill_distribution_per_month(db, location=location)
 
-    # 5. Save/Upsert into database
+    # 5. Clean up any stale partial/future records for current in-progress period
+    current_period = datetime.utcnow().strftime("%Y-%m")
+    db.query(MarketFeature).filter(
+        MarketFeature.location == location,
+        MarketFeature.period >= current_period
+    ).delete()
+
+    # 6. Save/Upsert into database
     records_saved = 0
     for _, row in df.iterrows():
         period = row["period"]

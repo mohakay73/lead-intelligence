@@ -565,7 +565,7 @@ def render_html(html_str: str):
 
 # ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
 @st.cache_resource(show_spinner=False)
-def setup_database(schema_version: int = 8):
+def setup_database(schema_version: int = 9):
     init_db()
     with SessionLocal() as s:
         auto_archive_expired_leads(s)
@@ -579,7 +579,7 @@ def setup_database(schema_version: int = 8):
         logging.getLogger("DatabaseSetup").warning(f"Feature & forecast pipeline refresh on boot: {e}")
     return True
 
-setup_database(schema_version=8)
+setup_database(schema_version=9)
 init_db()
 with SessionLocal() as s:
     auto_archive_expired_leads(s)
@@ -1427,11 +1427,15 @@ elif current_view == "Marknadsprognos & Trender":
                 marker=dict(size=6, color="#1C1C1C"),
             ))
 
-            # Bridge point
-            bridge_x = [hist_subset["period"].iloc[-1]] + list(fc_df["period"])
-            bridge_y = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["predicted_volume"])
-            bridge_lower = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["ci_lower"])
-            bridge_upper = [hist_subset["total_postings"].iloc[-1]] + list(fc_df["ci_upper"])
+            # Bridge point: strictly connect the last historical period to future forecasts
+            last_hist_period = hist_subset["period"].iloc[-1]
+            last_hist_val = hist_subset["total_postings"].iloc[-1]
+            fc_subset = fc_df[fc_df["period"] > last_hist_period].copy()
+
+            bridge_x = [last_hist_period] + list(fc_subset["period"])
+            bridge_y = [last_hist_val] + list(fc_subset["predicted_volume"])
+            bridge_lower = [last_hist_val] + list(fc_subset["ci_lower"])
+            bridge_upper = [last_hist_val] + list(fc_subset["ci_upper"])
 
             fig_fc.add_trace(go.Scatter(
                 x=bridge_x,
