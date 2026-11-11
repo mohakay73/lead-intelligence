@@ -2,8 +2,9 @@ name: Bi-Weekly Market Model Retraining & Forecast
 
 on:
   schedule:
-    # Runs on the 1st and 15th of every month at 22:20 UTC (23:20 CET Swedish time)
-    - cron: '20 22 1,15 * *'
+    # Runs on the 1st and 15th of every month at 01:42 UTC (02:42 CET Swedish time)
+    # Off-peak non-round minute to bypass GitHub Actions runner queue spikes
+    - cron: '42 1 1,15 * *'
   workflow_dispatch: # Allows manual on-demand trigger from GitHub Actions tab
 
 jobs:
@@ -25,13 +26,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 1. Run Feature Engineering Pipeline
+      - name: 1. Fetch Latest Macro Indicators (Riksbanken & KI)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python -m ingestion.macro_ingestion
+
+      - name: 2. Run Feature Engineering Pipeline
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           python -m analytics.feature_pipeline
 
-      - name: 2. Retrain Time-Series Model & Update Forecasts
+      - name: 3. Retrain Time-Series Model & Update Forecasts
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
