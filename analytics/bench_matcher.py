@@ -81,12 +81,29 @@ def match_consultant_to_leads(
     """
     Scans active market leads in Supabase and ranks opportunities by match percentage.
     """
-    c_skills: Set[str] = set(consultant.get("skills", []))
-    c_loc = consultant.get("location", "").lower()
+    # Extract skills: supports both flat skill lists and Cinode level-rated skills [{"name": "Azure", "level": 5}]
+    c_skills_raw = consultant.get("skills") or consultant.get("skills_with_levels") or []
+    c_skills: Set[str] = set()
+    skill_level_map: Dict[str, int] = {}
+
+    if isinstance(c_skills_raw, list):
+        for item in c_skills_raw:
+            if isinstance(item, dict):
+                s_name = item.get("name", "")
+                s_lvl = int(item.get("level", 3))
+                if s_name:
+                    c_skills.add(s_name)
+                    skill_level_map[s_name.lower()] = s_lvl
+            elif isinstance(item, str):
+                c_skills.add(item)
+                skill_level_map[item.lower()] = 3
+
+    c_loc = (consultant.get("location") or consultant.get("office") or "").lower()
     c_name = consultant.get("name", "Vår seniorkonsult")
     c_title = consultant.get("title", "IT-konsult")
-    c_avail = consultant.get("available_from", "inom 2–4 veckor")
-    c_clearance = consultant.get("clearance", False)
+    c_avail = str(consultant.get("available_from") or consultant.get("availability_status") or "inom 2–4 veckor")
+    c_clearance = consultant.get("clearance") or consultant.get("security_clearance") or False
+    c_resume = consultant.get("resume_summary") or consultant.get("summary") or ""
 
     # Fetch active leads only (Lead.source != "historical" and not archived/rejected)
     query = (
@@ -121,9 +138,14 @@ def match_consultant_to_leads(
         missing_skills = sorted(list(lead_skills.difference(c_skills)))
         bonus_skills = sorted(list(c_skills.difference(lead_skills)))
 
-        # 1. Base skill match score
+        # 1. Base skill match score with Cinode proficiency level weighting (1-5 scale)
         if lead_skills:
-            skill_ratio = len(matched_skills) / len(lead_skills)
+            base_ratio = len(matched_skills) / len(lead_skills)
+            # Senior/Expert level boost: level 4 gives bonus, level 5 gives top multiplier
+            level_weights = [skill_level_map.get(s.lower(), 3) for s in matched_skills]
+            avg_level = (sum(level_weights) / len(level_weights)) if level_weights else 3.0
+            seniority_mult = 0.85 + (avg_level / 5.0) * 0.30  # e.g. lvl 5 -> 1.15x, lvl 3 -> 1.03x
+            skill_ratio = min(1.0, base_ratio * seniority_mult)
         else:
             # Fallback: check if lead title/description mentions any consultant skills
             lead_text = f"{lead.title} {lead.description or ''}".lower()
@@ -173,9 +195,10 @@ def match_consultant_to_leads(
             }
             pitch = generate_sales_pitch(
                 lead=lead_dict,
-                consultant_profile=f"{c_title} ({consultant.get('seniority', 'Senior')}) med spetskompetens inom {', '.join(matched_skills[:4]) if matched_skills else c_title}",
+                consultant_profile=f"{c_title} ({consultant.get('office') or consultant.get('seniority') or 'Senior'}) med spetskompetens inom {', '.join(matched_skills[:4]) if matched_skills else c_title}",
                 consultant_name=c_name,
                 available_from=c_avail,
+                resume_summary=c_resume,
             )
 
             matches.append({

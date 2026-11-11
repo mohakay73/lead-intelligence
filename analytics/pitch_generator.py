@@ -12,9 +12,11 @@ def generate_sales_pitch(
     consultant_profile: Optional[str] = None,
     consultant_name: Optional[str] = None,
     available_from: Optional[str] = None,
+    resume_summary: Optional[str] = None,
 ) -> Dict[str, str]:
     """
     Generates an executive consulting pitch tailored to the specific lead requirements.
+    Incorporates actual Cinode CV highlights, certifications, and past project delivery when provided.
     
     Returns:
         dict with 'subject', 'body', and 'summary'
@@ -44,6 +46,10 @@ def generate_sales_pitch(
         else f"en erfaren specialist med gedigen bakgrund inom {skills_formatted}"
     )
 
+    cv_bullets = ""
+    if resume_summary and resume_summary.strip():
+        cv_bullets = f"\nErfarenheter & projektleveranser (ur Cinode-CV):\n• {resume_summary.strip()}\n"
+
     body = f"""Hej {company}-teamet,
 
 Jag såg ert aktuella behov gällande rollen som {title} i {location} och vill proaktivt presentera en stark matchning från vårt konsultteam.
@@ -52,7 +58,7 @@ Vi har {c_name}, {profile_desc}, som blir tillgänglig för nya uppdrag {c_avail
 
 Nyckelkompetenser som matchar era krav:
 {_format_skill_bullets(skills)}
-
+{cv_bullets}
 Kort om profilen:
 • Gedigen praktisk erfarenhet inom {skills_formatted}.
 • Erfarenhet av komplexa leveranser, agila team och självständigt drivande i liknande projekt.
@@ -63,7 +69,7 @@ Skulle det finnas intresse av att ta del av ett anonymiserat CV eller ta en kort
 Bästa hälsningar,
 [Ditt Namn]
 [Din Titel / Account Manager]
-[Företagsnamn]
+Consid
 [Telefonnummer | E-post]"""
 
     return {

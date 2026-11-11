@@ -6,6 +6,7 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
+    Date,
     Boolean,
     ForeignKey,
     Table,
@@ -145,3 +146,27 @@ class MacroIndicator(Base):
 
     def __repr__(self):
         return f'<MacroIndicator {self.period}: Ränta={self.policy_rate}%, KI={self.business_confidence_it}>'
+
+
+class Consultant(Base):
+    """
+    IT Consultants synchronized from Cinode ERP / Skills platform.
+    Tracks availability, bench status, skills with proficiency levels (1-5), and CV highlights.
+    """
+    __tablename__ = 'consultants'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cinode_id = Column(Integer, nullable=True, unique=True, index=True)
+    name = Column(String(150), nullable=False, index=True)
+    title = Column(String(150), nullable=False)
+    office = Column(String(100), nullable=False, default='Linköping', index=True)
+    availability_status = Column(String(50), nullable=False, default='Ledig', index=True)  # 'Ledig nu', 'Ledig inom 30d', 'Ledig inom 60d', 'Upptagen'
+    available_from = Column(Date, nullable=True)
+    skills_with_levels = Column(Text, nullable=True)  # JSON string: [{"name": "Azure", "level": 5}, ...]
+    resume_summary = Column(Text, nullable=True)  # Bio, project highlights, certifications
+    security_clearance = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Consultant {self.name} - {self.title} ({self.office}): {self.availability_status}>'

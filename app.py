@@ -566,23 +566,26 @@ def render_html(html_str: str):
 
 # ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
 @st.cache_resource(show_spinner=False)
-def setup_database(schema_version: int = 12):
+def setup_database(schema_version: int = 13):
     init_db()
     with SessionLocal() as s:
         auto_archive_expired_leads(s)
     try:
         from ingestion.macro_ingestion import run_macro_ingestion
+        from ingestion.cinode_client import sync_cinode_to_database
         from analytics.feature_pipeline import run_feature_pipeline
         from analytics.forecast_engine import run_all_forecasts
+        with SessionLocal() as s:
+            sync_cinode_to_database(s)
         run_macro_ingestion()
         run_feature_pipeline()
         run_all_forecasts()
     except Exception as e:
         import logging
-        logging.getLogger("DatabaseSetup").warning(f"Feature, macro & forecast pipeline refresh on boot: {e}")
+        logging.getLogger("DatabaseSetup").warning(f"Startup synchronization error: {e}")
     return True
 
-setup_database(schema_version=12)
+setup_database(schema_version=13)
 init_db()
 with SessionLocal() as s:
     auto_archive_expired_leads(s)
@@ -645,14 +648,34 @@ def cached_filtered_leads(search_term, location, source, selected_skill, status,
         )
 
 @st.cache_data(ttl=180, show_spinner=False)
-def cached_consultant_matches(consultant_name, consultant_title, consultant_location, consultant_skills_tuple, clearance, location_filter, min_match_pct, hide_recruiters=True, limit=25):
+def cached_consultant_matches(
+    consultant_name,
+    consultant_title,
+    consultant_location,
+    consultant_skills_tuple,
+    clearance,
+    location_filter,
+    min_match_pct,
+    hide_recruiters=True,
+    limit=25,
+    resume_summary="",
+    skills_with_levels_json="",
+):
     with SessionLocal() as s:
+        skills_with_levels = []
+        if skills_with_levels_json:
+            try:
+                skills_with_levels = json.loads(skills_with_levels_json)
+            except Exception:
+                skills_with_levels = []
         consultant_dict = {
             "name": consultant_name,
             "title": consultant_title,
             "location": consultant_location,
             "skills": list(consultant_skills_tuple),
+            "skills_with_levels": skills_with_levels,
             "clearance": clearance,
+            "resume_summary": resume_summary,
         }
         return match_consultant_to_leads(
             s,
@@ -662,6 +685,12 @@ def cached_consultant_matches(consultant_name, consultant_title, consultant_loca
             hide_recruiters=hide_recruiters,
             limit=limit,
         )
+
+@st.cache_data(ttl=180, show_spinner=False)
+def cached_cinode_consultants(office="Alla"):
+    with SessionLocal() as s:
+        from ingestion.cinode_client import get_available_consultants_from_db
+        return get_available_consultants_from_db(s, office=office)
 
 @st.cache_data(ttl=600, show_spinner=False)
 def cached_forecast_display_data(location):
@@ -1192,10 +1221,53 @@ elif current_view == "Uppdrag & Lead Pipeline":
 
 # ----------------- VIEW 3: KONSULTMATCHNING & BÄNKOPTIMERING -----------------
 elif current_view == "Konsultmatchning & Bänkoptimering":
-    st.markdown("##### Konsultmatchning & Bänkoptimering")
-    st.caption("Matcha tillgängliga konsulter mot regionens aktiva IT-krav med viktad poängberäkning och automatiska säljpitchar.")
+    col_v3_h1, col_v3_h2 = st.columns([3, 1])
+    with col_v3_h1:
+        st.markdown("##### Konsultmatchning & Bänkoptimering (Cinode)")
+        st.caption("Matcha tillgängliga konsulter från Cinode mot regionens aktiva IT-krav med kompetensnivåer (1–5), CV-highlights och automatiska säljpitchar.")
+    with col_v3_h2:
+        from ingestion.cinode_client import is_live_cinode_configured, sync_cinode_to_database
+        cinode_mode = "Live API" if is_live_cinode_configured() else "Sandbox (Consid)"
+        st.caption(f"Källa: **Cinode** ({cinode_mode})")
+        if st.button("🔄 Synka med Cinode", key="btn_sync_cinode", use_container_width=True):
+            with st.spinner("Hämtar profiler och CV-kompetenser från Cinode..."):
+                with SessionLocal() as sync_db:
+                    sync_res = sync_cinode_to_database(sync_db)
+                st.cache_data.clear()
+                st.toast(f"Synkroniserat {sync_res.get('synced_count', 0)} konsulter från Cinode!")
+                st.rerun()
 
-    profile_options = [f"{p['name']} – {p['title']} ({p['location']})" for p in PRESET_BENCH_PROFILES]
+    # Load synchronized Cinode consultants from database
+    db_consultants = cached_cinode_consultants(office="Alla")
+
+    profile_options = []
+    profile_dict_map = {}
+
+    if db_consultants:
+        for c in db_consultants:
+            label = f"👤 {c['name']} – {c['title']} ({c['office']}) • [{c['availability_status']}]"
+            profile_options.append(label)
+            profile_dict_map[label] = {
+                "name": c["name"],
+                "title": c["title"],
+                "office": c["office"],
+                "location": c["office"],
+                "availability_status": c["availability_status"],
+                "available_from": str(c["available_from"]) if c["available_from"] else c["availability_status"],
+                "skills": [s["name"] for s in c.get("skills_with_levels", [])],
+                "skills_with_levels": c.get("skills_with_levels", []),
+                "resume_summary": c.get("resume_summary", ""),
+                "summary": c.get("resume_summary", ""),
+                "security_clearance": c.get("security_clearance", False),
+                "clearance": c.get("security_clearance", False),
+                "is_cinode": True,
+            }
+    else:
+        for p in PRESET_BENCH_PROFILES:
+            label = f"{p['name']} – {p['title']} ({p['location']})"
+            profile_options.append(label)
+            profile_dict_map[label] = p
+
     profile_options.append("➕ Skapa egen konsultprofil / Klistra in CV")
 
     col_sel1, col_sel2 = st.columns([3, 1])
@@ -1211,23 +1283,38 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
     is_custom = "Skapa egen" in chosen_profile_label
 
     if not is_custom:
-        selected_prof_idx = profile_options.index(chosen_profile_label)
-        active_consultant = PRESET_BENCH_PROFILES[selected_prof_idx]
+        active_consultant = profile_dict_map[chosen_profile_label]
 
-        skills_pills = "".join([f'<span class="skill-tag">{s}</span>' for s in active_consultant["skills"]])
-        clearance_text = " • Säkerhetsprövad (RK3/SUA)" if active_consultant.get("clearance") else ""
+        skills_pills_list = []
+        if active_consultant.get("skills_with_levels"):
+            for s in active_consultant["skills_with_levels"]:
+                lvl = s.get("level", 3)
+                stars = "★" * lvl + "☆" * (5 - lvl)
+                skills_pills_list.append(f'<span class="skill-tag" title="Cinode-nivå {lvl}/5">{html.escape(s["name"])} <span style="font-size:0.75rem; color:#f59e0b;">{stars}</span></span>')
+        else:
+            for s in active_consultant.get("skills", []):
+                skills_pills_list.append(f'<span class="skill-tag">{html.escape(s)}</span>')
+        skills_pills = "".join(skills_pills_list)
+
+        clearance_text = " • 🛡️ Säkerhetsprövad (RK3/SUA)" if active_consultant.get("clearance") or active_consultant.get("security_clearance") else ""
+        avail_badge = active_consultant.get("availability_status") or active_consultant.get("available_from") or "Tillgänglig"
         
+        cinode_badge = '<span style="font-size:0.75rem; font-weight:600; background:rgba(181,34,63,0.12); color:#B5223F; padding:2px 8px; border-radius:12px; margin-left:6px;">Cinode-profil</span>' if active_consultant.get("is_cinode") else ""
+
+        cv_excerpt = active_consultant.get("resume_summary") or active_consultant.get("summary") or ""
+        cv_html = f'<div style="font-size: 0.85rem; opacity: 0.88; line-height: 1.5; margin-bottom: 12px; background: rgba(0,0,0,0.02); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #B5223F;"><strong>CV-utdrag:</strong> {html.escape(cv_excerpt)}</div>' if cv_excerpt else ""
+
         render_html(
             f"""
             <div style="background: rgba(128, 128, 128, 0.04); border: 1px solid rgba(128, 128, 128, 0.18); border-radius: 8px; padding: 18px 20px; margin-bottom: 22px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
                     <div>
-                        <div style="font-size: 1.15rem; font-weight: 700; color: inherit;">{html.escape(active_consultant['name'])}</div>
-                        <div style="font-size: 0.86rem; opacity: 0.8; margin-top: 2px;">{html.escape(active_consultant['title'])} • {html.escape(active_consultant['seniority'])} • {html.escape(active_consultant['location'])}{html.escape(clearance_text)}</div>
+                        <div style="font-size: 1.15rem; font-weight: 700; color: inherit;">{html.escape(active_consultant['name'])}{cinode_badge}</div>
+                        <div style="font-size: 0.86rem; opacity: 0.8; margin-top: 2px;">{html.escape(active_consultant['title'])} • {html.escape(active_consultant.get('office') or active_consultant.get('location', 'Regionen'))}{html.escape(clearance_text)}</div>
                     </div>
-                    <div class="priority-pill p-growth">{html.escape(active_consultant['available_from'])}</div>
+                    <div class="priority-pill p-growth">{html.escape(avail_badge)}</div>
                 </div>
-                <div style="font-size: 0.85rem; opacity: 0.85; line-height: 1.5; margin-bottom: 12px;">{html.escape(active_consultant['summary'])}</div>
+                {cv_html}
                 <div>{skills_pills}</div>
             </div>
             """
@@ -1264,23 +1351,33 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
             "name": c_name_input,
             "title": c_role_input,
             "seniority": c_seniority_input,
+            "office": c_loc_input,
             "location": c_loc_input,
+            "availability_status": c_avail_input,
             "available_from": c_avail_input,
+            "security_clearance": c_clear_input,
             "clearance": c_clear_input,
             "skills": custom_selected_skills,
-            "summary": raw_cv_text[:300] if raw_cv_text else f"{c_role_input} baserad i {c_loc_input}.",
+            "skills_with_levels": [{"name": s, "level": 3} for s in custom_selected_skills],
+            "resume_summary": raw_cv_text[:400] if raw_cv_text else f"{c_role_input} baserad i {c_loc_input}.",
+            "summary": raw_cv_text[:400] if raw_cv_text else f"{c_role_input} baserad i {c_loc_input}.",
+            "is_cinode": False,
         }
+
+    skills_levels_json = json.dumps(active_consultant.get("skills_with_levels", []))
 
     matched_leads = cached_consultant_matches(
         consultant_name=active_consultant["name"],
         consultant_title=active_consultant["title"],
-        consultant_location=active_consultant["location"],
+        consultant_location=active_consultant.get("office") or active_consultant.get("location", "Regionen"),
         consultant_skills_tuple=tuple(active_consultant["skills"]),
-        clearance=active_consultant.get("clearance", False),
+        clearance=active_consultant.get("security_clearance") or active_consultant.get("clearance", False),
         location_filter=selected_location if selected_location != "Alla" else None,
         min_match_pct=min_score,
         hide_recruiters=True,
         limit=25,
+        resume_summary=active_consultant.get("resume_summary") or active_consultant.get("summary", ""),
+        skills_with_levels_json=skills_levels_json,
     )
 
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
@@ -1371,7 +1468,7 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
                         db,
                         lead_id=lead["lead_id"],
                         status="Pitch skickad",
-                        assigned_to=active_consultant.get("location", "Konsultchef"),
+                        assigned_to=active_consultant.get("office") or active_consultant.get("location", "Konsultchef"),
                         candidate_name=active_consultant["name"],
                         notes=f"Matchad med {active_consultant['name']} ({lead['match_score']}% match).\nÄmne: {custom_sub}",
                     )
