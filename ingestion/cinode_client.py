@@ -14,8 +14,15 @@ import logging
 from datetime import datetime, date, timedelta
 from typing import Dict, Any, List, Optional
 import requests
+import sys
+import importlib
 from sqlalchemy.orm import Session
 from database.connection import SessionLocal
+
+# Ensure Consultant is reloaded in long-running processes (e.g. Streamlit Cloud)
+if "database.models" in sys.modules and not hasattr(sys.modules["database.models"], "Consultant"):
+    importlib.reload(sys.modules["database.models"])
+
 from database.models import Consultant
 
 logger = logging.getLogger("CinodeClient")

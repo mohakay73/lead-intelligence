@@ -170,3 +170,15 @@ class Consultant(Base):
 
     def __repr__(self):
         return f'<Consultant {self.name} - {self.title} ({self.office}): {self.availability_status}>'
+
+
+__all__ = [
+    "Base",
+    "lead_skills",
+    "Skill",
+    "Lead",
+    "MarketFeature",
+    "MarketForecast",
+    "MacroIndicator",
+    "Consultant",
+]

@@ -1,7 +1,14 @@
+import sys
+import importlib
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from config import DATABASE_URL
-from database.models import Base
+
+# Defensive reload in case database.models was cached in long-running processes (e.g. Streamlit Cloud)
+if "database.models" in sys.modules and not hasattr(sys.modules["database.models"], "Consultant"):
+    importlib.reload(sys.modules["database.models"])
+
+from database.models import Base, Consultant
 
 # Configure engine with robust pooling
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}

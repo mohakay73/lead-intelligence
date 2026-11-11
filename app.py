@@ -1,5 +1,7 @@
 import os
+import sys
 import html
+import importlib
 from pathlib import Path
 import streamlit as st
 import pandas as pd
@@ -11,8 +13,17 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env", override=True)
 
+# Defensive reload in case database.models was cached in long-running processes (e.g. Streamlit Cloud)
+if "database.models" in sys.modules and not hasattr(sys.modules["database.models"], "Consultant"):
+    importlib.reload(sys.modules["database.models"])
+
 from database.connection import init_db, SessionLocal
-from database.models import Skill, Lead
+from database.models import Skill, Lead, Consultant
+from ingestion.cinode_client import (
+    is_live_cinode_configured,
+    sync_cinode_to_database,
+    get_available_consultants_from_db,
+)
 from analytics.trend_engine import (
     get_overview_kpis,
     get_skill_demand,
@@ -566,13 +577,12 @@ def render_html(html_str: str):
 
 # ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
 @st.cache_resource(show_spinner=False)
-def setup_database(schema_version: int = 13):
+def setup_database(schema_version: int = 14):
     init_db()
     with SessionLocal() as s:
         auto_archive_expired_leads(s)
     try:
         from ingestion.macro_ingestion import run_macro_ingestion
-        from ingestion.cinode_client import sync_cinode_to_database
         from analytics.feature_pipeline import run_feature_pipeline
         from analytics.forecast_engine import run_all_forecasts
         with SessionLocal() as s:
@@ -585,7 +595,7 @@ def setup_database(schema_version: int = 13):
         logging.getLogger("DatabaseSetup").warning(f"Startup synchronization error: {e}")
     return True
 
-setup_database(schema_version=13)
+setup_database(schema_version=14)
 init_db()
 with SessionLocal() as s:
     auto_archive_expired_leads(s)
@@ -689,7 +699,6 @@ def cached_consultant_matches(
 @st.cache_data(ttl=180, show_spinner=False)
 def cached_cinode_consultants(office="Alla"):
     with SessionLocal() as s:
-        from ingestion.cinode_client import get_available_consultants_from_db
         return get_available_consultants_from_db(s, office=office)
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -1226,7 +1235,6 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
         st.markdown("##### Konsultmatchning & Bänkoptimering (Cinode)")
         st.caption("Matcha tillgängliga konsulter från Cinode mot regionens aktiva IT-krav med kompetensnivåer (1–5), CV-highlights och automatiska säljpitchar.")
     with col_v3_h2:
-        from ingestion.cinode_client import is_live_cinode_configured, sync_cinode_to_database
         cinode_mode = "Live API" if is_live_cinode_configured() else "Sandbox (Consid)"
         st.caption(f"Källa: **Cinode** ({cinode_mode})")
         if st.button("🔄 Synka med Cinode", key="btn_sync_cinode", use_container_width=True):
