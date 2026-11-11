@@ -1,4 +1,4 @@
-# 🎯 Consid Lead Intelligence & Bench Optimization Platform
+#  Consid Lead Intelligence & Bench Optimization Platform
 
 An enterprise market intelligence, macroeconomic forecasting, and consultant bench optimization system built for **Consid** leadership covering **Östergötland (Linköping, Norrköping, Finspång, Motala), Södertälje, and Nyköping**.
 
@@ -56,7 +56,7 @@ The platform automates the entire consulting sales and delivery lifecycle: inges
 
 ---
 
-## 📊 Core Modules & Dashboard Views
+##  Core Modules & Dashboard Views
 
 ### 1. Market Overview & Active Demand
 * **Executive KPI Cards**: Real-time tracking of active opportunities, direct consultant tenders, unique client organizations, and recruiter agency share.
@@ -95,7 +95,7 @@ The platform automates the entire consulting sales and delivery lifecycle: inges
 
 ---
 
-## 🛠️ Data Sources & API Integrations
+##  Data Sources & API Integrations
 
 | Data Source | Protocol | Description |
 | :--- | :--- | :--- |
@@ -109,7 +109,7 @@ The platform automates the entire consulting sales and delivery lifecycle: inges
 
 ---
 
-## 🚀 Quickstart & Setup Guide
+##  Quickstart & Setup Guide
 
 ### 1. Environment Preparation
 
@@ -166,15 +166,14 @@ streamlit run app.py
 
 ---
 
-## ⚙️ Automated Workflows (GitHub Actions)
+##  Automated Workflows (GitHub Actions)
 
 * **Market Ingestion (`.github/workflows/ingest_cron.yml`):** Runs every weekday at 07:00 CET to ingest and normalize active market leads from JobTech and Brainville.
 * **Executive Weekly Briefing (`.github/workflows/weekly_digest.yml`):** Compiles and dispatches the weekly intelligence brief every Monday at 07:30 CET via Microsoft Teams and Slack webhooks.
 * **MLOps Forecast & Macro Retraining (`.github/workflows/forecast_retrain.yml`):** Re-extracts macroeconomic features and retrains time-series prediction models on the 1st and 15th of every month at 02:42 CET.
 
 ---
-
-## 🔒 Security & Data Integrity
+##  Security & Data Integrity
 
 * **Security Clearance Alignment (RK3/SUA)**: Built-in classification and priority weighting for defense and public sector requirements (Linköping / Saab defense ecosystem).
 * **Zero Hardcoded Secrets**: All authentication tokens, database credentials, and API secrets are strictly managed via environment variables (`.env`) and GitHub Repository Secrets.
@@ -182,7 +181,7 @@ streamlit run app.py
 
 ---
 
-## 📄 License
+##  License
 
 Developed for strategic decision support, market forecasting, and bench optimization at Consid.
 All rights reserved.
