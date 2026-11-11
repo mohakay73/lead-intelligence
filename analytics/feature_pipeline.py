@@ -122,17 +122,34 @@ def build_and_save_market_features(db: Session, location: str = "Alla") -> int:
     df["rolling_mean_3m"] = df["total_postings"].shift(1).rolling(window=3, min_periods=1).mean().round(2)
     df["rolling_mean_6m"] = df["total_postings"].shift(1).rolling(window=6, min_periods=1).mean().round(2)
 
-    # 4. Monthly skill distribution
+    # 4. Macroeconomic leading features (Riksbanken policy rate with 3-month lag, KI confidence, layoffs)
+    from ingestion.macro_ingestion import get_macro_indicators_df
+    macro_df = get_macro_indicators_df(db)
+    if not macro_df.empty:
+        macro_df["policy_rate_lag3m"] = macro_df["policy_rate"].shift(3)
+        df = pd.merge(
+            df,
+            macro_df[["period", "policy_rate", "policy_rate_lag3m", "business_confidence_it", "layoff_notices_region"]],
+            on="period",
+            how="left",
+        )
+    else:
+        df["policy_rate"] = None
+        df["policy_rate_lag3m"] = None
+        df["business_confidence_it"] = None
+        df["layoff_notices_region"] = None
+
+    # 5. Monthly skill distribution
     skill_dist = compute_skill_distribution_per_month(db, location=location)
 
-    # 5. Clean up any stale partial/future records for current in-progress period
+    # 6. Clean up any stale partial/future records for current in-progress period
     current_period = datetime.utcnow().strftime("%Y-%m")
     db.query(MarketFeature).filter(
         MarketFeature.location == location,
         MarketFeature.period >= current_period
     ).delete()
 
-    # 6. Save/Upsert into database
+    # 7. Save/Upsert into database
     records_saved = 0
     for _, row in df.iterrows():
         period = row["period"]
@@ -143,6 +160,10 @@ def build_and_save_market_features(db: Session, location: str = "Alla") -> int:
         )
 
         skills_json = json.dumps(skill_dist.get(period, {}))
+        pol_rate = float(row["policy_rate"]) if pd.notna(row.get("policy_rate")) else None
+        pol_lag3 = float(row["policy_rate_lag3m"]) if pd.notna(row.get("policy_rate_lag3m")) else None
+        ki_conf = float(row["business_confidence_it"]) if pd.notna(row.get("business_confidence_it")) else None
+        layoffs = int(row["layoff_notices_region"]) if pd.notna(row.get("layoff_notices_region")) else None
 
         if not existing:
             feature_record = MarketFeature(
@@ -157,6 +178,10 @@ def build_and_save_market_features(db: Session, location: str = "Alla") -> int:
                 rolling_mean_6m=float(row["rolling_mean_6m"]) if pd.notna(row["rolling_mean_6m"]) else None,
                 month_num=int(row["month_num"]),
                 quarter=int(row["quarter"]),
+                policy_rate=pol_rate,
+                policy_rate_lag3m=pol_lag3,
+                business_confidence_it=ki_conf,
+                layoff_notices=layoffs,
                 skill_distribution=skills_json,
             )
             db.add(feature_record)
@@ -170,6 +195,10 @@ def build_and_save_market_features(db: Session, location: str = "Alla") -> int:
             existing.rolling_mean_6m = float(row["rolling_mean_6m"]) if pd.notna(row["rolling_mean_6m"]) else None
             existing.month_num = int(row["month_num"])
             existing.quarter = int(row["quarter"])
+            existing.policy_rate = pol_rate
+            existing.policy_rate_lag3m = pol_lag3
+            existing.business_confidence_it = ki_conf
+            existing.layoff_notices = layoffs
             existing.skill_distribution = skills_json
 
         records_saved += 1

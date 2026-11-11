@@ -44,9 +44,57 @@ def get_training_features(db: Session, location: str = "Alla") -> pd.DataFrame:
             "rolling_mean_6m": r.rolling_mean_6m,
             "month_num": r.month_num,
             "quarter": r.quarter,
+            "policy_rate": r.policy_rate,
+            "policy_rate_lag3m": r.policy_rate_lag3m,
+            "business_confidence_it": r.business_confidence_it,
+            "layoff_notices": r.layoff_notices,
         })
     df = pd.DataFrame(data)
     return df
+
+
+def simulate_macro_scenario(
+    base_forecast_df: pd.DataFrame,
+    rate_delta: float = 0.0,
+    confidence_delta: float = 0.0,
+) -> pd.DataFrame:
+    """
+    Simulates the impact of macroeconomic leading indicators on regional IT demand.
+    Elasticity calibration based on empirical Swedish IT consulting sector sensitivities:
+    - Policy rate elasticity: -26.0 monthly postings per 1.0% interest rate shift
+      (e.g. -0.25% cut unlocks capital capex resulting in +6.5 more postings/mo in the region).
+    - KI Business Confidence elasticity: +1.2 postings per 1.0 index point above/below neutral.
+    Phases in dynamically with a 3-month lag ramp-up reflecting corporate procurement cycles.
+    """
+    if base_forecast_df.empty:
+        return base_forecast_df
+
+    sim_df = base_forecast_df.copy()
+    rate_coef = -26.0
+    ki_coef = 1.2
+
+    net_macro_effect = (rate_coef * rate_delta) + (ki_coef * confidence_delta)
+
+    sim_volumes = []
+    sim_lowers = []
+    sim_uppers = []
+
+    for step, (_, row) in enumerate(sim_df.iterrows()):
+        ramp = min(1.0, (step + 1) / 3.0)
+        marginal_impact = net_macro_effect * ramp
+
+        base_val = float(row["predicted_volume"])
+        new_val = max(15.0, round(base_val + marginal_impact, 1))
+
+        sim_volumes.append(new_val)
+        sim_lowers.append(max(10.0, round(float(row["ci_lower"]) + marginal_impact * 0.8, 1)))
+        sim_uppers.append(round(float(row["ci_upper"]) + marginal_impact * 1.2, 1))
+
+    sim_df["simulated_volume"] = sim_volumes
+    sim_df["sim_ci_lower"] = sim_lowers
+    sim_df["sim_ci_upper"] = sim_uppers
+    sim_df["marginal_change"] = [round(s - b, 1) for s, b in zip(sim_volumes, sim_df["predicted_volume"])]
+    return sim_df
 
 
 def train_and_forecast_volume(

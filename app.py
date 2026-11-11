@@ -42,6 +42,7 @@ from analytics.historical_analytics import (
 from analytics.forecast_engine import (
     get_forecast_display_data,
     run_forecast_and_save,
+    simulate_macro_scenario,
 )
 from analytics.bench_matcher import (
     PRESET_BENCH_PROFILES,
@@ -565,7 +566,7 @@ def render_html(html_str: str):
 
 # ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
 @st.cache_resource(show_spinner=False)
-def setup_database(schema_version: int = 11):
+def setup_database(schema_version: int = 12):
     init_db()
     with SessionLocal() as s:
         auto_archive_expired_leads(s)
@@ -581,7 +582,7 @@ def setup_database(schema_version: int = 11):
         logging.getLogger("DatabaseSetup").warning(f"Feature, macro & forecast pipeline refresh on boot: {e}")
     return True
 
-setup_database(schema_version=11)
+setup_database(schema_version=12)
 init_db()
 with SessionLocal() as s:
     auto_archive_expired_leads(s)
@@ -1466,6 +1467,64 @@ elif current_view == "Marknadsprognos & Trender":
                     )
                 st.markdown("---")
 
+            # Interactive What-If Simulator Expander
+            last_hist_period = hist_subset["period"].iloc[-1]
+            last_hist_val = hist_subset["total_postings"].iloc[-1]
+            fc_subset = fc_df[fc_df["period"] > last_hist_period].head(6).copy()
+
+            sim_rate_delta = 0.0
+            sim_ki_delta = 0
+            sim_df = pd.DataFrame()
+            tot_diff = 0.0
+
+            with st.expander("🎛️ Ledningssimulator: 'What-If'-Scenario (Riksbankens Räntebana)", expanded=False):
+                st.caption(
+                    "Simulera hur Riksbankens framtida räntebeslut och IT-konjunkturen påverkar efterfrågan "
+                    "på konsulter i regionen de kommande 6 månaderna."
+                )
+                col_sim1, col_sim2 = st.columns(2)
+                with col_sim1:
+                    sim_rate_delta = st.select_slider(
+                        "Simulerad förändring av Riksbankens styrränta (procentenheter)",
+                        options=[-1.00, -0.75, -0.50, -0.25, 0.00, +0.25, +0.50, +0.75, +1.00],
+                        value=0.00,
+                        format_func=lambda x: f"{x:+.2f}% ({'Oförändrad' if x == 0 else ('Räntesänkning' if x < 0 else 'Räntehöjning')})",
+                        help="En räntesänkning sänker företagens kapitalkostnad och stimulerar IT-investeringar efter 3 månaders ramp-up.",
+                    )
+                with col_sim2:
+                    sim_ki_delta = st.slider(
+                        "Simulerad förändring i IT-konjunkturbarometer (KI-index)",
+                        min_value=-15,
+                        max_value=+15,
+                        value=0,
+                        step=1,
+                        format="%+d enheter",
+                        help="100 är normalläge. Högre värde innebär starkare framtidstro hos IT-inköpare.",
+                    )
+
+                if sim_rate_delta != 0.0 or sim_ki_delta != 0:
+                    sim_df = simulate_macro_scenario(
+                        fc_subset,
+                        rate_delta=sim_rate_delta,
+                        confidence_delta=float(sim_ki_delta),
+                    )
+                    tot_diff = float(sim_df["marginal_change"].sum())
+                    avg_diff = float(sim_df["marginal_change"].mean())
+                    badge_col = "#10b981" if tot_diff >= 0 else "#ef4444"
+                    status_lbl = "Positiv efterfrågeeffekt" if tot_diff >= 0 else "Dämpad efterfrågeeffekt"
+                    bg_col = "rgba(16, 185, 129, 0.08)" if tot_diff >= 0 else "rgba(239, 68, 68, 0.08)"
+
+                    st.markdown(
+                        f"""
+                        <div style="background: {bg_col}; border-left: 4px solid {badge_col}; padding: 10px 14px; border-radius: 4px; margin: 8px 0; font-size: 0.88rem;">
+                            <strong style="color: {badge_col};">{status_lbl}:</strong> 
+                            Estimerat utfall vid detta scenario: <strong>{tot_diff:+.0f} fler IT-uppdrag</strong> totalt över 6 månader 
+                            (snitt <strong>{avg_diff:+.1f} st/månad</strong> i regionen).
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
             # Forecast Line Chart with Confidence Interval
             hist_subset = hist_df.tail(18).copy()
             fig_fc = go.Figure()
@@ -1481,10 +1540,6 @@ elif current_view == "Marknadsprognos & Trender":
             ))
 
             # Bridge point: strictly connect the last historical period to future forecasts
-            last_hist_period = hist_subset["period"].iloc[-1]
-            last_hist_val = hist_subset["total_postings"].iloc[-1]
-            fc_subset = fc_df[fc_df["period"] > last_hist_period].head(6).copy()
-
             bridge_x = [last_hist_period] + list(fc_subset["period"])
             bridge_y = [last_hist_val] + list(fc_subset["predicted_volume"])
             bridge_lower = [last_hist_val] + list(fc_subset["ci_lower"])
@@ -1514,10 +1569,24 @@ elif current_view == "Marknadsprognos & Trender":
                 x=bridge_x,
                 y=bridge_y,
                 mode="lines+markers",
-                name="Maskininlärningsprognos",
+                name="Maskininlärningsprognos (Baslinje)",
                 line=dict(color="#B5223F", width=3, dash="dash"),
                 marker=dict(size=7, color="#B5223F", symbol="diamond"),
             ))
+
+            # Add What-If Scenario Trace if active
+            if not sim_df.empty and (sim_rate_delta != 0.0 or sim_ki_delta != 0):
+                bridge_sim_y = [last_hist_val] + list(sim_df["simulated_volume"])
+                sim_name = f"What-If Scenario ({sim_rate_delta:+.2f}%)"
+                sim_color = "#10b981" if tot_diff >= 0 else "#ea580c"
+                fig_fc.add_trace(go.Scatter(
+                    x=bridge_x,
+                    y=bridge_sim_y,
+                    mode="lines+markers",
+                    name=sim_name,
+                    line=dict(color=sim_color, width=3, dash="dot"),
+                    marker=dict(size=7, color=sim_color, symbol="triangle-up" if tot_diff >= 0 else "triangle-down"),
+                ))
 
             loc_label = selected_location if selected_location != "Alla" else "Hela regionen (Östergötland, Södertälje & Nyköping)"
             st.markdown(f"###### Marknadsprognos & Efterfrågebana ({loc_label})")

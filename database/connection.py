@@ -76,7 +76,11 @@ def init_db():
                 company_name ILIKE '%skill rekrytering%' OR
                 LOWER(TRIM(company_name)) = 'skill'
             );
-            """
+            """,
+            "ALTER TABLE market_features ADD COLUMN IF NOT EXISTS policy_rate FLOAT;",
+            "ALTER TABLE market_features ADD COLUMN IF NOT EXISTS policy_rate_lag3m FLOAT;",
+            "ALTER TABLE market_features ADD COLUMN IF NOT EXISTS business_confidence_it FLOAT;",
+            "ALTER TABLE market_features ADD COLUMN IF NOT EXISTS layoff_notices INTEGER;",
         ]
         for stmt in statements:
             try:

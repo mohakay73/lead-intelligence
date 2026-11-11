@@ -90,6 +90,10 @@ class MarketFeature(Base):
     rolling_mean_6m = Column(Float, nullable=True)
     month_num = Column(Integer, nullable=False)
     quarter = Column(Integer, nullable=False)
+    policy_rate = Column(Float, nullable=True)
+    policy_rate_lag3m = Column(Float, nullable=True)
+    business_confidence_it = Column(Float, nullable=True)
+    layoff_notices = Column(Integer, nullable=True)
     skill_distribution = Column(Text, nullable=True)  # JSON string of skill counts
     created_at = Column(DateTime, default=datetime.utcnow)
 
