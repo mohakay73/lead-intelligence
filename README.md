@@ -1,8 +1,8 @@
 # 🎯 Consid Lead Intelligence & Bench Optimization Platform
 
-An enterprise market intelligence, macroeconomic forecasting, and consultant bench optimization system built for **Consid** leadership covering **Östergötland (Linköping, Norrköping, Finspång, Motala), Södertälje & Nyköping**.
+An enterprise market intelligence, macroeconomic forecasting, and consultant bench optimization system built for **Consid** leadership covering **Östergötland (Linköping, Norrköping, Finspång, Motala), Södertälje, and Nyköping**.
 
-The platform automates the entire consulting sales and delivery pipeline: from ingesting open market tenders, broker assignments, and macroeconomic signals, to predictive 6-month demand forecasting and automated 1-to-1 matching with available consultants from **Cinode ERP**.
+The platform automates the entire consulting sales and delivery lifecycle: ingesting open market tenders, broker assignments, and macroeconomic signals, running predictive 6-month demand forecasting, and executing automated 1-to-1 matching with available consultants from **Cinode ERP**.
 
 ---
 
@@ -25,9 +25,9 @@ The platform automates the entire consulting sales and delivery pipeline: from i
                                                  ▼
                         ┌─────────────────────────────────────────────────┐
                         │        Macroeconomic Signals Engine             │
-                        │  • Riksbanken Styrränta (Policy Rate API)       │
-                        │  • Konjunkturinstitutet (KI IT-Barometer)       │
-                        │  • SCB / Arbetsförmedlingen Varselstatistik     │
+                        │  • Riksbanken Policy Rate (Styrränta API)       │
+                        │  • Konjunkturinstitutet (KI IT Barometer)       │
+                        │  • SCB / Arbetsförmedlingen Layoff Statistics   │
                         └────────────────────────┬────────────────────────┘
                                                  │
                                                  ▼
@@ -56,133 +56,133 @@ The platform automates the entire consulting sales and delivery pipeline: from i
 
 ---
 
-## 📊 Core Modules & Views
+## 📊 Core Modules & Dashboard Views
 
-### 1. Marknadsöversikt & Aktuella Behov
+### 1. Market Overview & Active Demand
 * **Executive KPI Cards**: Real-time tracking of active opportunities, direct consultant tenders, unique client organizations, and recruiter agency share.
-* **Kompetensranking**: Regional demand for technical stacks (.NET, Azure, C++, Python, Databricks, Cybersecurity, React, etc.).
-* **Geografisk fördelning & Tekniska vertikaler**: Interactive distribution charts across Linköping, Norrköping, Södertälje, and Nyköping.
-* **Topparbetsgivare**: Direct client needs (Saab, Scania, Region Östergötland, Sectra, Toyota Material Handling, IFS, etc.).
+* **Competency Ranking**: Regional demand across core technical stacks (.NET, Azure, C++, Python, Databricks, Cybersecurity, React, etc.).
+* **Geographic Distribution & Technical Verticals**: Interactive visual distribution across Linköping, Norrköping, Södertälje, and Nyköping.
+* **Top Hiring Organizations**: Identifies direct enterprise clients (Saab, Scania, Region Östergötland, Sectra, Toyota Material Handling, IFS, etc.).
 
-### 2. Uppdrag & Säljpipeline
-* **Multi-kriterie-sök**: Filtrera på kommun, ort, tekniska krav och uppdragstyp.
-* **Pipelinehantering (Kanban-status)**: Flytta uppdrag mellan `Nytt` → `Kvalificerad` → `Pitch skickad` → `Intervju bokad` → `Vunnen affär` → `Arkiverad`.
-* **Kandidattilldelning**: Koppla direkt konsultchef och kandidat till varje affärsmöjlighet.
-* **Snabbexport**: Exportera filtrerade leads till CSV för uppföljning i externa CRM-system.
+### 2. Lead Management & Sales Pipeline
+* **Multi-Criteria Search**: Filter by municipality, location, technical competencies, and assignment classification.
+* **Pipeline Management (Kanban Workflow)**: Track opportunities through configurable deal stages: `New` → `Qualified` → `Pitch Sent` → `Interview Booked` → `Won` → `Archived`.
+* **Consultant & Account Manager Allocation**: Directly assign account executives and consultant candidates to individual pipeline leads.
+* **Rapid Data Export**: Single-click export of filtered leads to CSV for external CRM follow-up and management reporting.
 
-### 3. Konsultmatchning & Bänkoptimering (Cinode ERP)
-* **Cinode Live Sync**: Läser in konsulter direkt från Consids Cinode-databas med realtidsstatus (`Ledig nu`, `Ledig inom 30d`, etc.).
-* **Kompetensnivåer (1–5 stjärnor)**: Cinodes kompetensgradering vägs in i matchningsgraden ($15\%–99\%$). Konsulter med nivå 4–5 i efterfrågade tekniker får en senioritetsmultiplikator.
-* **CV-berikad säljpitch**: Genererar skräddarsydda B2B-säljpitchar med konsultens faktiska projektleveranser, certifieringar och säkerhetsprövning (RK3/SUA).
-* **Flexibel inmatning**: Välj direkt från synkade Cinode-profiler eller klistra in ett externt CV för automatisk kompetensextraktion.
+### 3. Consultant Bench Matching & Pitching (Cinode ERP)
+* **Cinode Live Sync**: Automatically fetches available consultants directly from Consid's Cinode database with real-time status (`Available Now`, `Available within 30d`, etc.).
+* **Proficiency Level Weighting (1–5 Stars)**: Incorporates Cinode competency levels into the matching algorithm ($15\%–99\%$). Senior specialists (Levels 4–5) in required technologies receive an experience-based scoring multiplier.
+* **CV-Enriched Sales Pitching**: Generates personalized B2B outreach proposals incorporating the consultant's actual project accomplishments, certifications, and security clearance status (RK3/SUA).
+* **Flexible Input Modes**: Select directly from synchronized Cinode profiles or paste raw CV text for instant NLP-based skill extraction.
 
-### 4. Marknadsprognos & Trender (Unified Suite)
-* **Tab 1: 6-Månaders AI-Prognos**:
-  * Dämpad Holt-Winters tidsserieextrapolering med kalibrerade konfidensintervall (P10–P90) tränad på 58 månaders data (2022–2026).
-  * **Interaktiv What-If Scenariosimulator**: Modellera hur Riksbankens räntebana och IT-konjunkturen påverkar efterfrågan i Linköping, Norrköping, Södertälje och Nyköping.
-  * **Kompetensradar & Upskilling-matris**: Identifierar växande spetsteknologier (Terraform, Kubernetes, Databricks) för att guida utbildnings- och certifieringsbudgetar.
-* **Tab 2: Historik & Säsongsmönster (2022–2026)**:
-  * Långsiktig efterfrågedynamik över nästan 5 år (3 800+ historiska IT-krav).
-  * **Säsongsmönster (Jan–Dec)**: Synliggör årliga anställningstoppar (mars och oktober) för optimal säljtajming.
-  * **Kompetenstillväxt-Barometer (%)**: Kvantifierar snabbast växande ramverk och verktyg.
-* **Tab 3: Strategiskt Beslutsunderlag**:
-  * Handlingsinriktade råd för resursplanering, certifieringssatsningar och säkerhetsprövningar i försvarskorridoren Linköping och fordonsklustret i Södertälje.
+### 4. Predictive Market Forecast & Trends (Unified Suite)
+* **Tab 1: 6-Month Predictive AI Forecast**:
+  * Damped Holt-Winters time-series model with calibrated confidence intervals (P10–P90) trained on 58 months of empirical regional data (2022–2026).
+  * **Interactive Macro What-If Scenario Simulator**: Simulates how shifts in Riksbanken's policy rate and IT industry sentiment impact demand across Linköping, Norrköping, Södertälje, and Nyköping.
+  * **Competency Momentum & Upskilling Matrix**: Identifies accelerating high-margin technologies (Terraform, Kubernetes, Databricks) to guide talent development and training budgets.
+* **Tab 2: Historical Analytics & Seasonal Dynamics (2022–2026)**:
+  * Longitudinal volume trends spanning nearly 5 years (3,800+ historical IT postings).
+  * **Seasonal Index (Jan–Dec)**: Reveals annual regional hiring peaks (March and October) to optimize sales outreach timing.
+  * **Skill Growth Barometer (%)**: Quantifies fastest-growing frameworks, languages, and platforms.
+* **Tab 3: Strategic Decision Support**:
+  * Actionable executive recommendations for workforce planning, strategic certifications, and security clearance vetting in the Linköping defense corridor and Södertälje automotive cluster.
 
-### 5. Ledningsrapport & Veckobrev
-* **Automatiserat Veckobrev**: Formaterad executive sammanfattning av veckans marknadsläge.
-* **Exportmöjligheter**: Ett klick till Markdown (`.md`) eller fristående stylad HTML-email (`.html`).
-* **Webhooks**: Stöd för automatisk schemalagd utskickning till Microsoft Teams och Slack.
+### 5. Executive Intelligence Report & Weekly Briefing
+* **Automated Weekly Briefing**: Structured executive intelligence report summarizing regional market shifts, emerging demand clusters, and pipeline health.
+* **Multi-Format Export**: Single-click export to Markdown (`.md`) or standalone styled HTML email (`.html`).
+* **Webhook Integrations**: Automated dispatch support for Microsoft Teams and Slack channels.
 
 ---
 
-## 🛠️ Datakällor & API-integrationer
+## 🛠️ Data Sources & API Integrations
 
-| Datakälla | Typ | Beskrivning |
+| Data Source | Protocol | Description |
 | :--- | :--- | :--- |
-| **Cinode ERP** | REST / OAuth2 | Konsultprofiler, CV:n, kompetensnivåer (1–5) och bänkstatus. *(Dual-mode med live API + Consid sandbox)* |
-| **Brainville API** | REST / Token | Sveriges ledande öppna marknadsplats för konsultmäklare och frilansuppdrag. |
-| **Arbetsförmedlingen JobTech** | Public REST | Öppna regionala IT-annonser och direkta slutkundsrekryteringar. |
-| **JobTech Historical Archive** | Bulk REST | Historiskt IT-arkiv 2022–2026 för säsongs- och trendanalys (58 månader). |
-| **Riksbanken** | Open REST | Sveriges styrränta (reporänta) för makroekonomisk efterfrågemodellering. |
-| **Konjunkturinstitutet (KI)** | Open Data | Konjunkturbarometer för IT- och datakonsulttjänster. |
-| **SCB / Arbetsförmedlingen** | Open REST | Regional varselstatistik för Östergötland och Södermanland. |
+| **Cinode ERP** | REST / OAuth2 | Consultant profiles, CV accomplishments, proficiency ratings (1–5), and real-time bench availability. *(Dual-mode: live API + realistic Consid sandbox)* |
+| **Brainville API** | REST / Token | Sweden's leading marketplace for consulting brokers, freelance opportunities, and enterprise tenders. |
+| **Arbetsförmedlingen JobTech** | Public REST | Active regional IT postings and direct corporate hiring initiatives. |
+| **JobTech Historical Archive** | Bulk REST | Historical IT dataset (2022–2026) powering time-series and seasonal analytics (58 months). |
+| **Riksbanken** | Open REST | Sweden's central bank policy rate (reporänta) for macroeconomic demand forecasting. |
+| **National Institute of Economic Research (KI)** | Open Data | Business tendency survey (Konjunkturbarometer) for IT and consulting services. |
+| **Statistics Sweden (SCB) / Arbetsförmedlingen** | Open REST | Regional layoff notices (varselstatistik) for Östergötland and Södermanland. |
 
 ---
 
-## 🚀 Snabbstart & Installation
+## 🚀 Quickstart & Setup Guide
 
-### 1. Förbered miljö
+### 1. Environment Preparation
 
 ```bash
-# Klona repot
+# Clone the repository
 git clone https://github.com/mohakay73/lead-intelligence.git
 cd lead-intelligence
 
-# Skapa virtuell miljö
+# Create a virtual environment
 python -m venv .venv
 
-# Aktivera miljö (Windows PowerShell)
+# Activate the environment (Windows PowerShell)
 .venv\Scripts\Activate.ps1
 
-# Aktivera miljö (macOS / Linux)
+# Activate the environment (macOS / Linux)
 source .venv/bin/activate
 
-# Installera beroenden
+# Install required dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Konfigurera inställningar (`.env`)
+### 2. Configure Environment Variables (`.env`)
 
-Skapa eller uppdatera `.env` i rotkatalogen (se även `.env.example`):
+Create or update `.env` in the root directory (see `.env.example` for reference):
 
 ```ini
-# Databas (PostgreSQL på Supabase, eller lämna tomt för lokal SQLite leads.db)
+# Database (PostgreSQL on Supabase, or leave empty for local SQLite leads.db)
 DATABASE_URL=postgresql://postgres.xxx:xxx@aws-0-eu-west-2.pooler.supabase.com:5432/postgres
 
 # Cinode ERP & Skills API (OAuth2 Client Credentials)
-# Lämna tomt för att köra automatisk sandbox med realistiska Consid-profiler
+# Leave empty to run in automatic sandbox mode with realistic Consid profiles
 CINODE_ACCESS_ID=
 CINODE_ACCESS_SECRET=
 CINODE_COMPANY_ID=
 CINODE_BASE_URL=https://api.cinode.app
 CINODE_TOKEN_URL=https://api.cinode.app/token
 
-# Marknadskällor
+# Market Data Sources
 JOBTECH_API_KEY=
 BRAINVILLE_API_KEY=
 
-# Notifikationer (Valfritt)
+# Executive Notifications (Optional)
 TEAMS_WEBHOOK_URL=
 SLACK_WEBHOOK_URL=
 ```
 
-### 3. Starta applikationen
+### 3. Launch the Application
 
 ```bash
 streamlit run app.py
 ```
 
-*Applikationen kör automatiskt schemamigrering, synkroniserar Cinode-profiler och laddar in makro- och prognosmodeller vid första uppstart.*
+*Upon initial startup, the platform automatically applies database migrations, synchronizes Cinode consultant profiles, and computes baseline macroeconomic indicators and predictive models.*
 
 ---
 
-## ⚙️ Automatiserade Bakgrundsflöden (GitHub Actions)
+## ⚙️ Automated Workflows (GitHub Actions)
 
-* **Marknadsinsamling (`.github/workflows/ingest_cron.yml`):** Hämtar dagligen kl. 07:00 CET nya marknadsuppdrag från JobTech och Brainville.
-* **Veckobrev till Ledning (`.github/workflows/weekly_digest.yml`):** Sammanställer och skickar veckans marknadsrapport varje måndag kl. 07:30 CET till Teams/Slack.
-* **MLOps Prognos & Makro-omträning (`.github/workflows/forecast_retrain.yml`):** Uppdaterar makroindikatorer och tränar om maskininlärningsmodellerna den 1:a och 15:e varje månad kl. 02:42 CET.
-
----
-
-## 🔒 Säkerhet & Dataintegritet
-
-* **Säkerhetsprövning (RK3/SUA)**: Inbyggd flaggning och prioritering för försvars- och säkerhetsklassade uppdrag (Linköping / Saab-klustret).
-* **Inga hårdkodade hemligheter**: Alla tokens, lösenord och API-nycklar hanteras strikt via miljövariabler (`.env`) och GitHub Repository Secrets.
-* **Sandbox Graceful Degradation**: Systemet degraderar sömlöst till realistisk Consid-simulering om externa API-nycklar saknas eller tjänster har driftstörning.
+* **Market Ingestion (`.github/workflows/ingest_cron.yml`):** Runs every weekday at 07:00 CET to ingest and normalize active market leads from JobTech and Brainville.
+* **Executive Weekly Briefing (`.github/workflows/weekly_digest.yml`):** Compiles and dispatches the weekly intelligence brief every Monday at 07:30 CET via Microsoft Teams and Slack webhooks.
+* **MLOps Forecast & Macro Retraining (`.github/workflows/forecast_retrain.yml`):** Re-extracts macroeconomic features and retrains time-series prediction models on the 1st and 15th of every month at 02:42 CET.
 
 ---
 
-## 📄 Licens
+## 🔒 Security & Data Integrity
 
-Utvecklad för strategiskt beslutsstöd och konsultmatchning för ledningen inom Consid.
-Alla rättigheter förbehållna.
+* **Security Clearance Alignment (RK3/SUA)**: Built-in classification and priority weighting for defense and public sector requirements (Linköping / Saab defense ecosystem).
+* **Zero Hardcoded Secrets**: All authentication tokens, database credentials, and API secrets are strictly managed via environment variables (`.env`) and GitHub Repository Secrets.
+* **Graceful Sandbox Degradation**: The platform falls back seamlessly to realistic offline Consid simulations if external APIs are unreachable or pending enterprise access provisioning.
+
+---
+
+## 📄 License
+
+Developed for strategic decision support, market forecasting, and bench optimization at Consid.
+All rights reserved.
