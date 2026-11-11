@@ -565,7 +565,7 @@ def render_html(html_str: str):
 
 # ----------------- DATABASE INITIALIZATION (RUNS ONCE) -----------------
 @st.cache_resource(show_spinner=False)
-def setup_database(schema_version: int = 9):
+def setup_database(schema_version: int = 10):
     init_db()
     with SessionLocal() as s:
         auto_archive_expired_leads(s)
@@ -579,7 +579,7 @@ def setup_database(schema_version: int = 9):
         logging.getLogger("DatabaseSetup").warning(f"Feature & forecast pipeline refresh on boot: {e}")
     return True
 
-setup_database(schema_version=9)
+setup_database(schema_version=10)
 init_db()
 with SessionLocal() as s:
     auto_archive_expired_leads(s)
@@ -1430,7 +1430,7 @@ elif current_view == "Marknadsprognos & Trender":
             # Bridge point: strictly connect the last historical period to future forecasts
             last_hist_period = hist_subset["period"].iloc[-1]
             last_hist_val = hist_subset["total_postings"].iloc[-1]
-            fc_subset = fc_df[fc_df["period"] > last_hist_period].copy()
+            fc_subset = fc_df[fc_df["period"] > last_hist_period].head(6).copy()
 
             bridge_x = [last_hist_period] + list(fc_subset["period"])
             bridge_y = [last_hist_val] + list(fc_subset["predicted_volume"])

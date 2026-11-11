@@ -242,6 +242,13 @@ def run_forecast_and_save(db: Session, location: str = "Alla") -> Dict[str, Any]
     trending_skills = compute_skill_momentum_forecast(db, location=location)
     trending_skills_json = json.dumps(trending_skills)
 
+    valid_forecast_months = [fc["forecast_month"] for fc in forecasts]
+    # Purge any stale forecast months outside the active horizon for this location
+    db.query(MarketForecast).filter(
+        MarketForecast.location == location,
+        MarketForecast.forecast_month.notin_(valid_forecast_months),
+    ).delete()
+
     for fc in forecasts:
         f_month = fc["forecast_month"]
         existing = (
@@ -322,6 +329,8 @@ def get_forecast_display_data(db: Session, location: str = "Alla") -> Tuple[pd.D
         return hist_df, pd.DataFrame(), []
 
     fc_df = pd.DataFrame(fcs, columns=["period", "predicted_volume", "ci_lower", "ci_upper", "growth_mom_pct", "trending_skills"])
+    if not fc_df.empty:
+        fc_df = fc_df.head(6)
 
     trending_skills = []
     if not fc_df.empty and fc_df["trending_skills"].iloc[0]:
