@@ -81,6 +81,18 @@ def get_overview_kpis(db: Session) -> Dict[str, Any]:
         .scalar()
         or 0
     )
+    latest_sync_at = (
+        db.query(func.max(Lead.created_at))
+        .filter(Lead.source != "historical")
+        .scalar()
+    )
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    new_today = (
+        db.query(func.count(Lead.id))
+        .filter(Lead.source != "historical", Lead.created_at >= today_start)
+        .scalar()
+        or 0
+    )
 
     return {
         "total_leads": total_leads,
@@ -88,6 +100,8 @@ def get_overview_kpis(db: Session) -> Dict[str, Any]:
         "jobtech_leads": jobtech_leads,
         "unique_employers": unique_employers,
         "archived_leads": archived_leads,
+        "latest_sync_at": latest_sync_at,
+        "new_today": new_today,
     }
 
 

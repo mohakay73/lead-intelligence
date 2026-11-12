@@ -8,7 +8,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -793,20 +793,48 @@ consultant_only = st.sidebar.checkbox("Endast externa konsultuppdrag", value=Fal
 if consultant_only:
     selected_source = "brainville"
 
+overview_kpis = cached_overview_kpis()
+sync_time_str = "Nyligen"
+if overview_kpis.get("latest_sync_at"):
+    dt = overview_kpis["latest_sync_at"]
+    cet_dt = dt + timedelta(hours=1)
+    if cet_dt.date() == (datetime.utcnow() + timedelta(hours=1)).date():
+        sync_time_str = f"Idag kl. {cet_dt.strftime('%H:%M')} CET"
+    else:
+        sync_time_str = cet_dt.strftime("%Y-%m-%d %H:%M CET")
+
+new_today_count = overview_kpis.get("new_today", 0)
+new_today_html = f' • <span style="color:#16a34a; font-weight:700;">+{new_today_count} nya idag</span>' if new_today_count > 0 else ""
+
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Datainsamling**")
+st.sidebar.markdown(
+    f"""
+    <div style="font-size:0.78rem; opacity:0.85; margin-bottom:8px; line-height:1.4;">
+        🕒 Senaste insamling: <strong>{sync_time_str}</strong>{new_today_html}<br>
+        📊 Aktiva marknadsbehov: <strong>{overview_kpis.get('total_leads', 0)} st</strong>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-if st.sidebar.button("Synkronisera data nu", use_container_width=True):
-    with st.spinner("Ansluter till källor och uppdaterar databas..."):
-        try:
-            stats = run_pipeline()
-            st.sidebar.success(
-                f"Klar. Nya poster: {stats['new_leads_saved']}, Uppdaterade: {stats['existing_leads_updated']}"
-            )
-            st.cache_data.clear()
-            st.rerun()
-        except Exception as e:
-            st.sidebar.error(f"Synkroniseringsfel: {e}")
+col_sb1, col_sb2 = st.sidebar.columns(2)
+with col_sb1:
+    if st.button("🔄 Uppdatera vy", use_container_width=True, help="Tömmer webbappens minnescache och hämtar senaste data direkt från databasen."):
+        st.cache_data.clear()
+        st.rerun()
+with col_sb2:
+    if st.button("Hämta nytt nu", use_container_width=True, help="Kör manuell insamling mot källorna omedelbart."):
+        with st.spinner("Ansluter till källor och uppdaterar databas..."):
+            try:
+                stats = run_pipeline()
+                st.sidebar.success(
+                    f"Klar. Nya poster: {stats['new_leads_saved']}, Uppdaterade: {stats['existing_leads_updated']}"
+                )
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"Synkroniseringsfel: {e}")
 
 st.sidebar.markdown(
     """
@@ -841,14 +869,14 @@ render_html(
             <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; opacity: 0.6; letter-spacing: 0.06em;">Aktiv arbetsvy:</span>
             <span style="font-size: 1.18rem; font-weight: 700; color: inherit; letter-spacing: -0.01em; margin-left: 6px;">{current_view}</span>
         </div>
-        <span style="font-size: 0.74rem; opacity: 0.65;">Uppdateras i realtid via Supabase & Schemalagd sync</span>
+        <span style="font-size: 0.76rem; opacity: 0.85;">🕒 Senaste datainsamling: <strong>{sync_time_str}</strong>{new_today_html}</span>
     </div>
     """
 )
 
 # ----------------- VIEW 1: MARKNADSÖVERSIKT & EFTERFRÅGAN -----------------
 if current_view == "Marknadsöversikt & Efterfrågan":
-    kpis = cached_overview_kpis()
+    kpis = overview_kpis
 
     # Macro KPI Grid
     render_html(
