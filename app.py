@@ -38,6 +38,10 @@ from analytics.trend_engine import (
     auto_archive_expired_leads,
 )
 from analytics.pitch_generator import generate_sales_pitch
+from analytics.deal_economics import (
+    suggest_consultant_economics,
+    calculate_deal_economics,
+)
 from analytics.weekly_digest import (
     build_weekly_intelligence_data,
     format_markdown_digest,
@@ -1341,6 +1345,9 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
         cv_excerpt = active_consultant.get("resume_summary") or active_consultant.get("summary") or ""
         cv_html = f'<div style="font-size: 0.85rem; opacity: 0.88; line-height: 1.5; margin-bottom: 12px; background: rgba(0,0,0,0.02); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #B5223F;"><strong>CV-utdrag:</strong> {html.escape(cv_excerpt)}</div>' if cv_excerpt else ""
 
+        consultant_econ = suggest_consultant_economics(active_consultant.get("title", ""), active_consultant.get("seniority", ""))
+        bench_cost_str = f"{consultant_econ['monthly_bench_cost']:,} kr/mån".replace(",", " ")
+
         render_html(
             f"""
             <div style="background: rgba(128, 128, 128, 0.04); border: 1px solid rgba(128, 128, 128, 0.18); border-radius: 8px; padding: 18px 20px; margin-bottom: 22px;">
@@ -1348,6 +1355,7 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
                     <div>
                         <div style="font-size: 1.15rem; font-weight: 700; color: inherit;">{html.escape(active_consultant['name'])}{cinode_badge}</div>
                         <div style="font-size: 0.86rem; opacity: 0.8; margin-top: 2px;">{html.escape(active_consultant['title'])} • {html.escape(active_consultant.get('office') or active_consultant.get('location', 'Regionen'))}{html.escape(clearance_text)}</div>
+                        <div style="font-size: 0.78rem; opacity: 0.72; margin-top: 3px;">💼 Riktpris: ~{consultant_econ['hourly_rate']} kr/h • Uppskattad bänkkostnad: ~{bench_cost_str}</div>
                     </div>
                     <div class="priority-pill p-growth">{html.escape(avail_badge)}</div>
                 </div>
@@ -1492,13 +1500,64 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
             """
             render_html(card_html)
 
-            with st.expander(f"Generera säljpitch för {active_consultant['name']} till {lead['company']}"):
-                col_sp1, col_sp2 = st.columns([3, 1])
-                with col_sp1:
-                    custom_sub = st.text_input("Föreslagen ämnesrad", value=lead["pitch_subject"], key=f"pitch_sub_{lead['lead_id']}_{active_consultant['name']}")
-                with col_sp2:
-                    st.caption("Färdigt att kopiera & skicka")
-                custom_body = st.text_area("Säljmejl (redigerbart)", value=lead["pitch_body"], height=190, key=f"pitch_body_{lead['lead_id']}_{active_consultant['name']}")
+            with st.expander(f"🎯 Säljpitch & Affärskalkylator ({active_consultant['name']} → {lead['company']})"):
+                tab_pitch, tab_deal = st.tabs(["✉️ Säljpitch", "💰 Affärsvärde & Bänkkalkylator"])
+
+                # --- Tab 2: Deal Economics ---
+                with tab_deal:
+                    consultant_econ = suggest_consultant_economics(active_consultant.get("title", ""), active_consultant.get("seniority", ""))
+                    col_ec1, col_ec2 = st.columns(2)
+                    with col_ec1:
+                        deal_rate = st.slider(
+                            "Debiterbart timarvode (kr/h)",
+                            min_value=750,
+                            max_value=2000,
+                            value=int(consultant_econ["hourly_rate"]),
+                            step=25,
+                            key=f"deal_rate_{lead['lead_id']}_{active_consultant['name']}",
+                            help="Priset kunden betalar per timme. Standardvärde baseras på konsultens roll och senioritet.",
+                        )
+                    with col_ec2:
+                        deal_months = st.slider(
+                            "Uppskattad uppdragslängd (månader)",
+                            min_value=1,
+                            max_value=12,
+                            value=6,
+                            step=1,
+                            key=f"deal_months_{lead['lead_id']}_{active_consultant['name']}",
+                            help="Kontraktets beräknade löptid.",
+                        )
+
+                    deal_res = calculate_deal_economics(
+                        hourly_rate=deal_rate,
+                        duration_months=deal_months,
+                        monthly_bench_cost=consultant_econ["monthly_bench_cost"],
+                    )
+
+                    col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+                    with col_met1:
+                        st.metric("Kontraktsvärde", deal_res["formatted_revenue"])
+                    with col_met2:
+                        st.metric("Stoppad Bänkkostnad", deal_res["formatted_avoided_cost"])
+                    with col_met3:
+                        st.metric("Täckningsbidrag (TB)", deal_res["formatted_margin"])
+                    with col_met4:
+                        st.metric("Vinstmarginal", f"{deal_res['margin_pct']}%")
+
+                    st.caption(
+                        f"Beräknat på 168 debiterbara timmar/månad. Schablon för bänkkostnad: {consultant_econ['monthly_bench_cost']:,} kr/mån (lön, 31,42% soc, ITP-pension, overhead)."
+                    )
+
+                # --- Tab 1: Pitch ---
+                with tab_pitch:
+                    col_sp1, col_sp2 = st.columns([3, 1])
+                    with col_sp1:
+                        custom_sub = st.text_input("Föreslagen ämnesrad", value=lead["pitch_subject"], key=f"pitch_sub_{lead['lead_id']}_{active_consultant['name']}")
+                    with col_sp2:
+                        st.caption("Färdigt att kopiera & skicka")
+                    custom_body = st.text_area("Säljmejl (redigerbart)", value=lead["pitch_body"], height=190, key=f"pitch_body_{lead['lead_id']}_{active_consultant['name']}")
+
+                deal_note_snippet = f"Affärsvärde: {deal_res['formatted_revenue']} ({deal_rate} kr/h x {deal_months} mån, TB: {deal_res['formatted_margin']})"
 
                 if st.button(f"🚀 Spara pitch & flytta till 'Pitch skickad'", key=f"pipe_save_{lead['lead_id']}_{active_consultant['name']}", use_container_width=True):
                     update_lead_status(
@@ -1507,7 +1566,7 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
                         status="Pitch skickad",
                         assigned_to=active_consultant.get("office") or active_consultant.get("location", "Konsultchef"),
                         candidate_name=active_consultant["name"],
-                        notes=f"Matchad med {active_consultant['name']} ({lead['match_score']}% match).\nÄmne: {custom_sub}",
+                        notes=f"Matchad med {active_consultant['name']} ({lead['match_score']}% match).\n{deal_note_snippet}\nÄmne: {custom_sub}",
                     )
                     st.toast(f"Uppdraget har sparats och flyttats till Säljpipeline som 'Pitch skickad' för {active_consultant['name']}!")
                     st.cache_data.clear()
