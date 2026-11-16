@@ -1509,13 +1509,13 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
                     col_ec1, col_ec2 = st.columns(2)
                     with col_ec1:
                         deal_rate = st.slider(
-                            "Debiterbart timarvode (kr/h)",
+                            "Debiterbart timarvode till kund (kr/h)",
                             min_value=750,
                             max_value=2000,
                             value=int(consultant_econ["hourly_rate"]),
                             step=25,
                             key=f"deal_rate_{lead['lead_id']}_{active_consultant['name']}",
-                            help="Priset kunden betalar per timme. Standardvärde baseras på konsultens roll och senioritet.",
+                            help="Priset kunden betalar per timme. Standard baseras på konsultens roll och marknadsnivå.",
                         )
                     with col_ec2:
                         deal_months = st.slider(
@@ -1528,24 +1528,67 @@ elif current_view == "Konsultmatchning & Bänkoptimering":
                             help="Kontraktets beräknade löptid.",
                         )
 
-                    deal_res = calculate_deal_economics(
-                        hourly_rate=deal_rate,
-                        duration_months=deal_months,
-                        monthly_bench_cost=consultant_econ["monthly_bench_cost"],
-                    )
+                    st.markdown("**Konsultens lön & kostnad (justera för att få exakt vinst):**")
+                    col_cost_type, col_cost_val = st.columns([1.6, 2.4])
+                    with col_cost_type:
+                        cost_mode = st.radio(
+                            "Kostnadsmetod",
+                            ["Månadslön (Fast anställd)", "Timkostnad (kr/h / Underkonsult)"],
+                            key=f"cost_mode_{lead['lead_id']}_{active_consultant['name']}",
+                            label_visibility="collapsed",
+                        )
+                    with col_cost_val:
+                        if "Månadslön" in cost_mode:
+                            def_salary = consultant_econ.get("monthly_salary", 58000)
+                            c_salary = st.number_input(
+                                "Månadslön (kr/mån)",
+                                min_value=25000,
+                                max_value=130000,
+                                value=int(def_salary),
+                                step=1000,
+                                key=f"salary_{lead['lead_id']}_{active_consultant['name']}",
+                                help="Konsultens fasta bruttomånadslön. Systemet lägger automatiskt till lagstadgad arbetsgivaravgift (31,42%), ITP-tjänstepension (8,0%) samt overhead."
+                            )
+                            deal_res = calculate_deal_economics(
+                                hourly_rate=deal_rate,
+                                duration_months=deal_months,
+                                monthly_salary=c_salary,
+                            )
+                        else:
+                            def_hourly_cost = consultant_econ.get("hourly_cost", 565)
+                            c_hourly_cost = st.number_input(
+                                "Intern timkostnad (kr/h)",
+                                min_value=200,
+                                max_value=1600,
+                                value=int(def_hourly_cost),
+                                step=25,
+                                key=f"hourly_cost_{lead['lead_id']}_{active_consultant['name']}",
+                                help="Konsultens direkta kostnad eller inköpspris per timme. Perfekt för underkonsulter och frilansare."
+                            )
+                            deal_res = calculate_deal_economics(
+                                hourly_rate=deal_rate,
+                                duration_months=deal_months,
+                                hourly_cost=c_hourly_cost,
+                            )
 
                     col_met1, col_met2, col_met3, col_met4 = st.columns(4)
                     with col_met1:
                         st.metric("Kontraktsvärde", deal_res["formatted_revenue"])
                     with col_met2:
-                        st.metric("Stoppad Bänkkostnad", deal_res["formatted_avoided_cost"])
+                        st.metric("Konsultens Kostnad", f"{deal_res['hourly_cost']} kr/h")
                     with col_met3:
-                        st.metric("Täckningsbidrag (TB)", deal_res["formatted_margin"])
+                        st.metric("Exakt Vinst (TB)", deal_res["formatted_margin"], delta=f"+{deal_res['hourly_profit']} kr/h")
                     with col_met4:
                         st.metric("Vinstmarginal", f"{deal_res['margin_pct']}%")
 
+                    cost_info_detail = (
+                        f"Månadslön {c_salary:,} kr + 31,42% soc + 8% ITP-pension + overhead = {deal_res['monthly_bench_cost']:,} kr/mån (~{deal_res['hourly_cost']} kr/h)."
+                        if "Månadslön" in cost_mode
+                        else f"Direkt timkostnad: {c_hourly_cost} kr/h (totalt {deal_res['formatted_cost']} under uppdraget)."
+                    ).replace(",", " ")
+
                     st.caption(
-                        f"Beräknat på 168 debiterbara timmar/månad. Schablon för bänkkostnad: {consultant_econ['monthly_bench_cost']:,} kr/mån (lön, 31,42% soc, ITP-pension, overhead)."
+                        f"💡 Vinst per debiterad timme: **+{deal_res['hourly_profit']} kr/h**. {cost_info_detail}"
                     )
 
                 # --- Tab 1: Pitch ---
