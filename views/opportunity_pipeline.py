@@ -139,6 +139,16 @@ def render_opportunity_pipeline(
         total_leads = len(leads_list)
         total_pages = max(1, (total_leads + per_page - 1) // per_page)
 
+        # Callback handlers for rock-solid Streamlit state sync
+        def _nav_pipe_page(delta: int):
+            cur = st.session_state.get("pipe_page_num", 1)
+            nxt = max(1, min(cur + delta, total_pages))
+            st.session_state["pipe_page_num"] = nxt
+            st.session_state["pipe_page_select"] = nxt
+
+        def _on_pipe_select_change():
+            st.session_state["pipe_page_num"] = st.session_state.get("pipe_page_select", 1)
+
         # Reset to page 1 if search or filters changed
         current_filter_hash = (
             search_query,
@@ -151,16 +161,22 @@ def render_opportunity_pipeline(
         )
         if st.session_state.get("pipe_filter_state") != current_filter_hash:
             st.session_state["pipe_filter_state"] = current_filter_hash
-            st.session_state["pipe_page"] = 1
+            st.session_state["pipe_page_num"] = 1
+            st.session_state["pipe_page_select"] = 1
 
         # Keep current_page within valid bounds
-        current_page = st.session_state.get("pipe_page", 1)
+        current_page = st.session_state.get("pipe_page_num", 1)
         if current_page > total_pages:
             current_page = total_pages
-            st.session_state["pipe_page"] = total_pages
+            st.session_state["pipe_page_num"] = total_pages
+            st.session_state["pipe_page_select"] = total_pages
         elif current_page < 1:
             current_page = 1
-            st.session_state["pipe_page"] = 1
+            st.session_state["pipe_page_num"] = 1
+            st.session_state["pipe_page_select"] = 1
+
+        if "pipe_page_select" not in st.session_state or st.session_state["pipe_page_select"] != current_page:
+            st.session_state["pipe_page_select"] = current_page
 
         start_idx = (current_page - 1) * per_page
         end_idx = min(start_idx + per_page, total_leads)
@@ -191,26 +207,33 @@ def render_opportunity_pipeline(
         if total_pages > 1:
             col_p1, col_p2, col_p3 = st.columns([1.2, 2.6, 1.2])
             with col_p1:
-                if st.button("⬅ Föregående sida", disabled=(current_page <= 1), key="btn_pipe_prev_top", use_container_width=True):
-                    st.session_state["pipe_page"] = max(1, current_page - 1)
-                    st.rerun()
+                st.button(
+                    "⬅ Föregående sida",
+                    disabled=(current_page <= 1),
+                    key="btn_pipe_prev_top",
+                    on_click=_nav_pipe_page,
+                    args=(-1,),
+                    use_container_width=True,
+                )
             with col_p2:
                 page_options = list(range(1, total_pages + 1))
-                chosen_page = st.selectbox(
+                st.selectbox(
                     "Gå till sida",
                     page_options,
-                    index=current_page - 1,
-                    key="pipe_page_selector",
+                    key="pipe_page_select",
+                    on_change=_on_pipe_select_change,
                     format_func=lambda p: f"Sida {p} av {total_pages} (uppdrag {min((p-1)*per_page + 1, total_leads)}–{min(p*per_page, total_leads)})",
                     label_visibility="collapsed",
                 )
-                if chosen_page != current_page:
-                    st.session_state["pipe_page"] = chosen_page
-                    st.rerun()
             with col_p3:
-                if st.button("Nästa sida ➡", disabled=(current_page >= total_pages), key="btn_pipe_next_top", use_container_width=True):
-                    st.session_state["pipe_page"] = min(total_pages, current_page + 1)
-                    st.rerun()
+                st.button(
+                    "Nästa sida ➡",
+                    disabled=(current_page >= total_pages),
+                    key="btn_pipe_next_top",
+                    on_click=_nav_pipe_page,
+                    args=(1,),
+                    use_container_width=True,
+                )
     else:
         st.info("Inga uppdrag matchar ditt valda filter just nu.")
         page_leads = []
@@ -356,9 +379,14 @@ def render_opportunity_pipeline(
         st.markdown("---")
         col_bp1, col_bp2, col_bp3 = st.columns([1.2, 2.6, 1.2])
         with col_bp1:
-            if st.button("⬅ Föregående sida", disabled=(current_page <= 1), key="btn_pipe_prev_bottom", use_container_width=True):
-                st.session_state["pipe_page"] = max(1, current_page - 1)
-                st.rerun()
+            st.button(
+                "⬅ Föregående sida",
+                disabled=(current_page <= 1),
+                key="btn_pipe_prev_bottom",
+                on_click=_nav_pipe_page,
+                args=(-1,),
+                use_container_width=True,
+            )
         with col_bp2:
             st.markdown(
                 f"<div style='text-align:center; padding-top:8px; font-weight:600; font-size:0.88rem; opacity:0.85;'>"
@@ -367,6 +395,11 @@ def render_opportunity_pipeline(
                 unsafe_allow_html=True,
             )
         with col_bp3:
-            if st.button("Nästa sida ➡", disabled=(current_page >= total_pages), key="btn_pipe_next_bottom", use_container_width=True):
-                st.session_state["pipe_page"] = min(total_pages, current_page + 1)
-                st.rerun()
+            st.button(
+                "Nästa sida ➡",
+                disabled=(current_page >= total_pages),
+                key="btn_pipe_next_bottom",
+                on_click=_nav_pipe_page,
+                args=(1,),
+                use_container_width=True,
+            )
