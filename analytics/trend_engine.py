@@ -255,6 +255,7 @@ def get_pipeline_kpis(
     db: Session,
     location: Optional[str] = None,
     hide_recruiters: bool = True,
+    source: Optional[str] = None,
 ) -> Dict[str, int]:
     """Calculates lead counts across each stage of the consulting sales pipeline using fast SQL aggregation."""
     status_col = func.coalesce(Lead.status, "Nytt")
@@ -268,6 +269,9 @@ def get_pipeline_kpis(
     if location and location != "Alla":
         query = query.filter(Lead.location.ilike(f"%{location}%"))
 
+    if source and source != "Alla":
+        query = query.filter(Lead.source == source)
+
     try:
         results = query.group_by(status_col).all()
     except Exception:
@@ -279,6 +283,8 @@ def get_pipeline_kpis(
         )
         if location and location != "Alla":
             fb_query = fb_query.filter(Lead.location.ilike(f"%{location}%"))
+        if source and source != "Alla":
+            fb_query = fb_query.filter(Lead.source == source)
         results = fb_query.group_by(status_col).all()
 
     kpis = {

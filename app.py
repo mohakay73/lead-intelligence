@@ -121,9 +121,9 @@ def cached_category_distribution(location, source):
         return get_category_distribution(s, location=location, source=source)
 
 @st.cache_data(ttl=120, show_spinner=False)
-def cached_pipeline_kpis(location, hide_recruiters=True):
+def cached_pipeline_kpis(location, hide_recruiters=True, source="Alla"):
     with SessionLocal() as s:
-        return get_pipeline_kpis(s, location=location, hide_recruiters=hide_recruiters)
+        return get_pipeline_kpis(s, location=location, hide_recruiters=hide_recruiters, source=source)
 
 @st.cache_data(ttl=300, show_spinner=False)
 def cached_skills_list():
