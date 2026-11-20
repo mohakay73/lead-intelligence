@@ -11,6 +11,185 @@ from analytics.pitch_generator import generate_sales_pitch
 from ui.styles import render_html, get_status_badge_html
 
 
+def _render_kanban_board(db, leads_list, pipe_kpis):
+    """Renders visual 5-column Kanban board for active pipeline opportunities."""
+    stages = [
+        {
+            "id": "Nytt",
+            "title": "📥 1. Nytt",
+            "color": "#64748b",
+            "badge_bg": "rgba(100, 116, 139, 0.12)",
+            "border": "rgba(100, 116, 139, 0.3)",
+            "next_status": "Granskas",
+            "next_btn": "Kvalificera ➡",
+            "max_cards": 12,
+        },
+        {
+            "id": "Granskas",
+            "title": "🔍 2. Granskas",
+            "color": "#d97706",
+            "badge_bg": "rgba(245, 158, 11, 0.14)",
+            "border": "rgba(245, 158, 11, 0.35)",
+            "next_status": "Pitch skickad",
+            "next_btn": "Skicka Pitch ➡",
+            "max_cards": 30,
+        },
+        {
+            "id": "Pitch skickad",
+            "title": "✉️ 3. Pitch skickad",
+            "color": "#B5223F",
+            "badge_bg": "rgba(181, 34, 63, 0.12)",
+            "border": "rgba(181, 34, 63, 0.35)",
+            "next_status": "Intervju",
+            "next_btn": "Boka Intervju ➡",
+            "max_cards": 30,
+        },
+        {
+            "id": "Intervju",
+            "title": "🤝 4. Intervju",
+            "color": "#6366f1",
+            "badge_bg": "rgba(99, 102, 241, 0.14)",
+            "border": "rgba(99, 102, 241, 0.35)",
+            "next_status": "Vunnet",
+            "next_btn": "Vinn affär 🏆",
+            "max_cards": 30,
+        },
+        {
+            "id": "Vunnet",
+            "title": "🏆 5. Vunnet",
+            "color": "#059669",
+            "badge_bg": "rgba(16, 185, 129, 0.14)",
+            "border": "rgba(16, 185, 129, 0.35)",
+            "next_status": None,
+            "next_btn": None,
+            "max_cards": 30,
+        },
+    ]
+
+    cols = st.columns(5)
+    ALL_STATUSES = ["Nytt", "Granskas", "Pitch skickad", "Intervju", "Vunnet", "Avböjt", "Arkiverad"]
+
+    for idx, stage in enumerate(stages):
+        stage_id = stage["id"]
+        if stage_id == "Nytt":
+            stage_leads = [l for l in leads_list if l.get("status") in ("Nytt", None, "")]
+        elif stage_id == "Vunnet":
+            stage_leads = [l for l in leads_list if l.get("status") in ("Vunnet", "Tillsatt")]
+        else:
+            stage_leads = [l for l in leads_list if l.get("status") == stage_id]
+
+        with cols[idx]:
+            st.markdown(
+                f"""
+                <div style="background:{stage['badge_bg']}; border:1px solid {stage['border']}; border-radius:10px; padding:8px 12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:0.8rem; font-weight:700; color:{stage['color']}; text-transform:uppercase; letter-spacing:0.04em;">
+                        {stage['title']}
+                    </span>
+                    <span style="font-size:0.75rem; font-weight:800; background:rgba(128,128,128,0.15); padding:2px 7px; border-radius:9999px;">
+                        {len(stage_leads)}
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            if not stage_leads:
+                st.markdown(
+                    f"<div style='border:1px dashed {stage['border']}; border-radius:8px; padding:24px 10px; text-align:center; font-size:0.78rem; opacity:0.6; margin-bottom:12px;'>"
+                    f"Inga uppdrag i detta steg"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                displayed = stage_leads[:stage["max_cards"]]
+                for lead in displayed:
+                    with st.container(border=True):
+                        source_label = "Konsult" if lead.get("is_consultant") else "Rekrytering"
+                        source_col = "#B5223F" if lead.get("is_consultant") else "#64748b"
+
+                        st.markdown(
+                            f"<div style='display:flex; justify-content:space-between; align-items:center; font-size:0.68rem; margin-bottom:4px;'>"
+                            f"<span style='color:{source_col}; font-weight:700; text-transform:uppercase;'>{source_label}</span>"
+                            f"<span style='opacity:0.6;'>{lead.get('published_at', '')}</span>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                        title_text = lead['title']
+                        if len(title_text) > 42:
+                            title_text = title_text[:39] + "..."
+                        st.markdown(f"**{html.escape(title_text)}**")
+
+                        comp_text = f"🏢 {html.escape(lead['company_name'] or 'Konfidentiell')}"
+                        loc_text = f"📍 {html.escape(lead['location'] or 'Regionen')}"
+                        st.caption(f"{comp_text} • {loc_text}")
+
+                        if lead.get("candidate_name"):
+                            st.markdown(
+                                f"<div style='font-size:0.75rem; color:#B5223F; font-weight:600; margin-bottom:4px;'>⭐ {html.escape(lead['candidate_name'])}</div>",
+                                unsafe_allow_html=True,
+                            )
+                        if lead.get("assigned_to"):
+                            st.markdown(
+                                f"<div style='font-size:0.72rem; opacity:0.75; margin-bottom:6px;'>👤 {html.escape(lead['assigned_to'])}</div>",
+                                unsafe_allow_html=True,
+                            )
+
+                        if stage["next_status"]:
+                            if st.button(
+                                stage["next_btn"],
+                                key=f"kb_next_{stage_id}_{lead['id']}",
+                                use_container_width=True,
+                            ):
+                                update_lead_status(db, lead_id=lead["id"], status=stage["next_status"])
+                                st.toast(f"Uppdrag flyttat till {stage['next_status']}!")
+                                st.cache_data.clear()
+                                st.rerun()
+
+                        with st.expander("Hantera ⚙️", expanded=False):
+                            cur_st = lead.get("status") or "Nytt"
+                            cur_idx = ALL_STATUSES.index(cur_st) if cur_st in ALL_STATUSES else 0
+                            new_st = st.selectbox(
+                                "Status",
+                                ALL_STATUSES,
+                                index=cur_idx,
+                                key=f"kb_st_{stage_id}_{lead['id']}",
+                            )
+                            new_cand = st.text_input(
+                                "Föreslagen konsult",
+                                value=lead.get("candidate_name", ""),
+                                key=f"kb_cand_{stage_id}_{lead['id']}",
+                                placeholder="Konsultens namn",
+                            )
+                            new_ass = st.text_input(
+                                "Ansvarig",
+                                value=lead.get("assigned_to", ""),
+                                key=f"kb_ass_{stage_id}_{lead['id']}",
+                                placeholder="Konsultchef",
+                            )
+                            new_nt = st.text_area(
+                                "Notering",
+                                value=lead.get("notes", ""),
+                                key=f"kb_nt_{stage_id}_{lead['id']}",
+                                height=65,
+                            )
+                            if st.button("Spara ändringar", key=f"kb_save_{stage_id}_{lead['id']}", use_container_width=True):
+                                update_lead_status(
+                                    db,
+                                    lead_id=lead["id"],
+                                    status=new_st,
+                                    assigned_to=new_ass,
+                                    candidate_name=new_cand,
+                                    notes=new_nt,
+                                )
+                                st.toast("Uppdrag sparat!")
+                                st.cache_data.clear()
+                                st.rerun()
+
+                if len(stage_leads) > stage["max_cards"]:
+                    st.caption(f"ℹ️ +{len(stage_leads) - stage['max_cards']} fler uppdrag. Växla till Listvy för komplett bläddring.")
+
+
 def render_opportunity_pipeline(
     db,
     selected_location: str,
@@ -102,6 +281,40 @@ def render_opportunity_pipeline(
         )
 
     st.markdown("---")
+
+    # View Mode Switcher: List View vs. Kanban Board
+    col_mode_head, col_mode_pick = st.columns([3, 2])
+    with col_mode_head:
+        st.markdown("###### Arbetsläge")
+    with col_mode_pick:
+        pipeline_view_mode = st.radio(
+            "Visningsläge",
+            ["📋 Listvy (Paginering)", "📊 Kanban-tavla"],
+            horizontal=True,
+            key="pipeline_view_mode",
+            label_visibility="collapsed",
+        )
+
+    if pipeline_view_mode == "📊 Kanban-tavla":
+        col_kb_search, col_kb_skill = st.columns([3, 2])
+        with col_kb_search:
+            kb_search = st.text_input("Sök i Kanban-tavlan", "", placeholder="Sök bolag, roll eller teknik...", key="kb_search_input")
+        with col_kb_skill:
+            skills_in_db = cached_skills_list()
+            kb_skill = st.selectbox("Filtrera på kompetens", ["Alla"] + skills_in_db, key="kb_skill_input")
+
+        kanban_leads = cached_filtered_leads(
+            search_term=kb_search,
+            location=selected_location,
+            source=selected_source,
+            selected_skill=kb_skill,
+            status="Aktiva uppdrag",
+            assigned_to=None,
+            hide_recruiters=hide_recruiters,
+            limit=1500,
+        )
+        _render_kanban_board(db, kanban_leads, pipe_kpis)
+        return
 
     # 2. Filter & Controls
     col_search, col_status_filter, col_skill_filter, col_per_page = st.columns([2.5, 1.8, 1.8, 1])
